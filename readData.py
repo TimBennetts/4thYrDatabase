@@ -39,7 +39,7 @@ def readWs(ws):
             if "SKU" in ws.cell(i,2).value or "Item Name" in ws.cell(i,2).value: #hard-coding
                 startRow = i + 1
                 useCol = 2
-            elif "SKU" in ws.cell(i,1).value or "Style Name" in ws.cell(i,1).value:
+            elif "SKU" in ws.cell(i,1).value or "Item Name" in ws.cell(i,1).value:
                 startRow = i + 1
                 useCol = 1
             elif "Item Name" in ws.cell(i,0).value:
@@ -74,26 +74,12 @@ def readFiles(directory):
     #importing all files in directory
     for root,dirs,files in os.walk(directory):
         for file in files:
-            if file.endswith(".xlsx") or file.endswith(".xls"):
+            if file.endswith(".xlsx") or file.endswith(".xls") :
                 # print file
                 fin = xlrd.open_workbook(os.path.abspath(os.path.join(directory,file)))
                 #grab first worksheet
                 wsList.append(fin.sheet_by_index(0))
     return wsList
-
-def refineRange(wsRange, headers):
-    wsRangeNew = []
-    for i, header in enumerate(headers):
-        for j, title in enumerate(header):
-            # print i, title
-            if title.value == "Item Name":
-                print wsRange[i][j]
-              # wsRangeNew[i][0] = wsRange[i][j]
-            elif "SKU" in title.value:
-                print i, j
-
-
-    return wsRange
 
 def readStockWs(ws):
     startRow = 0
@@ -101,16 +87,11 @@ def readStockWs(ws):
     endRow = 0
     #finding row range
     for i in range(0, ws.nrows):
-        if  type(ws.cell(i,0).value) == unicode:
-            if "Item No." in ws.cell(i,0).value and i < ws.nrows-2:
-                if "Owner" in ws.cell(i+1,0).value:
-                    startRow = i+2
-                elif startRow == 0:
-                    startRow = i+1
-            elif "Total for Category" in ws.cell(i,0).value:
-                endRow = i - 1
-            elif "Items" in ws.cell(i,0).value and endRow == 0:
-                endRow = i - 1
+        if type(ws.cell(i,0).value) == unicode:
+            if "Item No." in ws.cell(i,0).value:
+                startRow = i+1
+            elif "" in ws.cell(i,0).value:
+                endRow = i -1
     #finding col range
     for j in range(0, ws.ncols):
         if ws.cell(startRow,j).value == "":
@@ -121,6 +102,18 @@ def readStockWs(ws):
     wsRange = getCellRange(startCol, startRow, endCol, endRow, ws)
     headers = recordHeaders(startRow, endCol, ws)
     return wsRange, headers
+
+def readSaleWs(ws):
+    startRow = 1
+    startCol = 0
+    endRow = ws.nrows - 1
+    endCol = ws.ncols - 1
+    wsRange = getCellRange(startCol, startRow, endCol, endRow, ws)
+    headers = recordHeaders(startRow, endCol, ws)
+    return wsRange, headers
+
+
+
 
 
 
