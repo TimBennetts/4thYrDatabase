@@ -9,13 +9,18 @@ from readData import *
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+import datetime
 
 
 #Change these
 dbname = "BBBYO.db"
 
-metadata = MetaData()
-Base = declarative_base()
+metadata  = MetaData()
+Base    = declarative_base()
+Session   = sessionmaker()
+dbEngine  = None
+dbSession = None
+
 filePath = "CAM MIKE DATA\B2B"
 filePath2 = "CAM MIKE DATA\Stock Reports"
 filePath3 = "CAM MIKE DATA\B2C"
@@ -33,7 +38,16 @@ class theActivePurchaseOrder(Base):
     quantity = Column(Integer) #or total quantity
     costPrice = Column(Float) #exclude gst
     totalCost = Column(Float) #exclude gst
-    date = Column(String)
+    date = Column(Date)
+    
+    def __str__(self):
+      theStr = "Order: " + str(self.orderNum)
+      theStr += ", SKU: " + str(self.skuNum)
+      theStr += ", Date: " + str(self.date)
+      theStr += "\nAmount: " + str(self.quantity)
+      theStr += " @ $" + str(self.costPrice)
+      theStr += " = $" + str(self.totalCost)
+      return theStr
 
 class TandWPurchaseOrder(Base):
     __tablename__ = 'TandWPurchaseOrder'
@@ -46,7 +60,7 @@ class TandWPurchaseOrder(Base):
     quantity = Column(Integer)
     costPrice = Column(Float)
     totalCost = Column(Float)
-    agreedDeliveryDate = Column(String)
+    agreedDeliveryDate = Column(Date)
     colour = Column(String)
     material = Column(String)
     itemDims = Column(String)
@@ -68,13 +82,13 @@ class OZPurchaseOrder(Base):
     costPrice = Column(Float)
     totalCost = Column(Float)
     skuNum = Column(String)
-    date = Column(String)
+    date = Column(Date)
 
 class SalesData(Base):
     __tablename__ = 'SalesData'
 
     saleID = Column(String, primary_key=True)
-    date = Column(String)
+    date = Column(Date)
     orderName = Column(String)
     transactionType = Column(String)
     saleType = Column(String)
@@ -111,9 +125,9 @@ class hardToFind(Base):
     shippingState = Column(String)
     shippingPostcode = Column(Integer)
     shippingCountry = Column(String)
-    orderDate = Column(String)
+    orderDate = Column(Date)
     orderStatus = Column(String)
-    shipDate = Column(String)
+    shipDate = Column(Date)
     productName = Column(String)
     productVariation = Column(String)
     personalisation = Column(String)
@@ -144,7 +158,7 @@ class ordersExport(Base):
     discountCode = Column(String)
     discountAmount = Column(String)
     shippingMethod = Column(String)
-    timeEntryCreated = Column(String)
+    timeEntryCreated = Column(Date)
     lineitemQty = Column(Integer)
     lineitemName = Column(String)
     lineitemPrice = Column(Float)
@@ -197,24 +211,24 @@ class stockReports(Base):
     picks = Column(Integer)
     frozenStock = Column(Integer)
     freeStock = Column(Integer)
-    date = Column(String)
-
-
-
+    date = Column(Date)
 
 def createDB(dbname):
     global dbEngine
     global dbSession
-
+    
     dbEngine = create_engine('sqlite:///' + dbname, echo=False)
-    #create Session
-    Session = sessionmaker()
-    Session.configure(bind=dbEngine)
-    dbSession = Session()
-
+    
     #create tables
     Base.metadata.create_all(dbEngine)
+    Session.configure(bind=dbEngine)
+    
+    #create Session
+    dbSession = Session()
+
     print "db created"
+    
+    return dbSession
 
 
 def readPurchaseOrder(purchDirectory):
@@ -238,7 +252,7 @@ def readPurchaseOrder(purchDirectory):
                     quantity = wsRange[i][j][1].value,
                     costPrice = wsRange[i][j][2].value,
                     totalCost = wsRange[i][j][3].value,
-                    date = wsRange[i][j][5].value
+                    date = dateTimeConv(wsRange[i][j][5].value)
                 )
                 dbSession.add(OZPurchOrder)
 
@@ -252,7 +266,7 @@ def readPurchaseOrder(purchDirectory):
                                                     quantity = wsRange[i][j][5].value,
                                                     costPrice = wsRange[i][j][6].value,
                                                     totalCost = wsRange[i][j][7].value,
-                                                    agreedDeliveryDate = wsRange[i][j][8].value,
+                                                    agreedDeliveryDate = dateTimeConv(wsRange[i][j][8].value),
                                                     colour = wsRange[i][j][9].value,
                                                     material = wsRange[i][j][10].value,
                                                     itemDims = wsRange[i][j][11].value,
@@ -274,7 +288,7 @@ def readPurchaseOrder(purchDirectory):
                                                             quantity = wsRange[i][j][2].value,  # or total quantity
                                                             costPrice = wsRange[i][j][3].value,  # exclude gst
                                                             totalCost = wsRange[i][j][4].value,  # exclude gst
-                                                            date = wsRange[i][j][5].value,
+                                                            date = dateTimeConv(wsRange[i][j][5].value),
 
                 )
                 dbSession.add(theActivePurchOrder)
@@ -301,7 +315,7 @@ def readStockReports(stockDirectory):
                                     picks = wsRange[i][j][3].value,
                                     frozenStock = wsRange[i][j][4].value,
                                     freeStock = wsRange[i][j][5].value,
-                                    date = wsRange[i][j][6].value,
+                                    date = dateTimeConv(wsRange[i][j][6].value),
                 )
             dbSession.add(stockReport)
             counter1 = counter1 + 1
@@ -331,9 +345,9 @@ def readSales(salesDirectory):
                                         shippingState = wsRange[i][j][5].value,
                                         shippingPostcode = wsRange[i][j][6].value,
                                         shippingCountry = wsRange[i][j][7].value,
-                                        orderDate = wsRange[i][j][8].value,
+                                        orderDate = dateTimeConv(wsRange[i][j][8].value),
                                         orderStatus = wsRange[i][j][9].value,
-                                        shipDate = wsRange[i][j][10].value,
+                                        shipDate = dateTimeConv(wsRange[i][j][10].value),
                                         productName = wsRange[i][j][11].value,
                                         productVariation = wsRange[i][j][12].value,
                                         personalisation = wsRange[i][j][13].value,
@@ -346,7 +360,6 @@ def readSales(salesDirectory):
                                         shippingMethod = wsRange[i][j][20].value,
                 )
                 dbSession.add(hardtofind)
-
 
             elif i == 1: #orders export
                 ordersexport = ordersExport(
@@ -366,7 +379,7 @@ def readSales(salesDirectory):
                                             discountCode = wsRange[i][j][12].value,
                                             discountAmount = wsRange[i][j][13].value,
                                             shippingMethod = wsRange[i][j][14].value,
-                                            timeEntryCreated = wsRange[i][j][15].value,
+                                            timeEntryCreated = dateTimeConv(wsRange[i][j][15].value),
                                             lineitemQty = wsRange[i][j][16].value,
                                             lineitemName = wsRange[i][j][17].value,
                                             lineitemPrice = wsRange[i][j][18].value,
@@ -415,7 +428,7 @@ def readSales(salesDirectory):
             elif i == 2: # sales
                 salesdata = SalesData(
                                     saleID = wsRange[i][j][0].value,
-                                    date = wsRange[i][j][1].value,
+                                    date = dateTimeConv(wsRange[i][j][1].value),
                                     orderName = wsRange[i][j][2].value,
                                     transactionType = wsRange[i][j][3].value,
                                     saleType = wsRange[i][j][4].value,
@@ -449,18 +462,20 @@ def readSales(salesDirectory):
 
 
 
+def initialise():
+  createDB(dbname)
+  # Adding the purchase order files into the database
+  for subDirs, dirs, files in os.walk(purchDirectory):
+      if subDirs != purchDirectory:
+          # print subDirs
+          readPurchaseOrder(subDirs)
+  
+  # Adding the stock reports to the database
+  readStockReports(stockDirectory)
+  
+  # Adding the sales files to the database
+  readSales(salesDirectory)
 
-createDB(dbname)
-Base.metadata.create_all(dbEngine)
-# Adding the purchase order files into the database
-for subDirs, dirs, files in os.walk(purchDirectory):
-    if subDirs != purchDirectory:
-        # print subDirs
-        readPurchaseOrder(subDirs)
 
-# Adding the stock reports to the database
-readStockReports(stockDirectory)
-
-# Adding the sales files to the database
-readSales(salesDirectory)
-
+if __name__ == '__main__':
+  initialise()

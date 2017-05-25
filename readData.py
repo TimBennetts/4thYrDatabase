@@ -2,7 +2,8 @@ import os
 import xlrd
 import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
-
+import datetime
+from dateutil import parser
 
 Base = declarative_base()
 
@@ -111,6 +112,25 @@ def readSaleWs(ws):
     wsRange = getCellRange(startCol, startRow, endCol, endRow, ws)
     headers = recordHeaders(startRow, endCol, ws)
     return wsRange, headers
+
+
+def dateTimeConv(xlDate):
+    if type(xlDate) == unicode:
+        if xlDate == "":
+            #setting empty dates to start of datetime can then filter those out
+            dt = datetime.datetime.utcfromtimestamp(0)
+        else:
+            #convert strings of type 25-04-1996 to datetime
+            try:
+                dt = datetime.datetime.strptime(xlDate, "%d/%m/%Y")
+            except ValueError:
+                dt = datetime.datetime.strptime(xlDate, "%Y-%m-%d")
+
+    elif type(xlDate) == float:
+        dateTuple = xldate_as_tuple(xlDate, 0)
+        dt = datetime.datetime(*dateTuple[0:6])
+    return dt
+
 
 
 
