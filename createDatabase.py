@@ -460,8 +460,6 @@ def readSales(salesDirectory):
 
 
 
-
-
 def initialise():
   createDB(dbname)
   # Adding the purchase order files into the database

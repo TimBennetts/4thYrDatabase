@@ -124,7 +124,14 @@ def dateTimeConv(xlDate):
             try:
                 dt = datetime.datetime.strptime(xlDate, "%d/%m/%Y")
             except ValueError:
-                dt = datetime.datetime.strptime(xlDate, "%Y-%m-%d")
+                try:
+                    dt = datetime.datetime.strptime(xlDate, "%Y-%m-%d")
+                except ValueError:
+                    try:
+                        dt = datetime.datetime.strptime(xlDate, "%m/%d/%y")
+                    except ValueError:
+                        print(xlDate)
+                        print(type(xlDate))
 
     elif type(xlDate) == float:
         dateTuple = xldate_as_tuple(xlDate, 0)

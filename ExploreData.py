@@ -4,11 +4,9 @@ from readData import *
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from math import *
 from createDatabase import theActivePurchaseOrder, createDB, stockReports
-from matplotlib import *
 import matplotlib.pyplot as plt
-from numpy import *
+
 
 def loadSession():
     global dbEngine
@@ -60,14 +58,14 @@ def readStock():
 
   # Single graph
     for row in dbSession.query(stockReports).order_by(stockReports.date.desc()):
-        if row.skuNum == 'FTR-WOOD500':
+        if row.skuNum == 'FTRWOODGRAI':
             stockFreeStock.append(row.freeStock)
             stockDate.append(row.date)
 
     plt.plot(stockDate, stockFreeStock, '.-')
     plt.xlabel("Dates")
     plt.ylabel("Stock level")
-    plt.title("Stock level for FTR-WOOD500")
+    plt.title("Stock level for FTR-WOODGRAIN")
     plt.show()
 
 if __name__ == '__main__':
