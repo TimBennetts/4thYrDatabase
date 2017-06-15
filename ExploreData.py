@@ -4,10 +4,13 @@ from readData import *
 from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from createDatabase import theActivePurchaseOrder, createDB, stockReports, freightInvoices
+from createDatabase import OZPurchaseOrder, SalesData, TandWPurchaseOrder, hardToFind, \
+    ordersExport, theActivePurchaseOrder, createDB, stockReports, freightInvoices
 import matplotlib.pyplot as plt
 import pandas as pd
 from numpy import array
+import numpy as np
+
 
 def linreg(X, Y):
 
@@ -137,10 +140,131 @@ def loadSession():
     conn = dbEngine.connect()
     metadata = MetaData(dbEngine, reflect=True)
 
-def readSales():
-    data = Table('SalesData', metadata, autoload=True, autoload_with=dbEngine)
-    print(repr(data))
-    print data
+def readSales(skuRef):
+    # pre-allocate arrays
+    salesQ = []
+    salesDate = []
+    salesSku = []
+
+    #OZPurchaseOrder
+    if skuRef == "all":
+        for row in dbSession.query(OZPurchaseOrder):
+            salesQ.append(row.quantity)
+            salesDate.append(row.orderDate)
+            salesSku.append(row.skuNum)
+    else:
+        for row in dbSession.query(OZPurchaseOrder):
+            if skuRef in row.skuNum:
+                salesQ.append(row.quantity)
+                salesDate.append(row.orderDate)
+                salesSku.append(row.skuNum)
+
+    # SalesData
+    if skuRef == "all":
+        for row in dbSession.query(SalesData):
+            salesQ.append(row.quantity)
+            salesDate.append(row.orderDate)
+            salesSku.append(row.skuNum)
+    else:
+        for row in dbSession.query(SalesData):
+            if skuRef in row.skuNum:
+                salesQ.append(row.quantity)
+                salesDate.append(row.orderDate)
+                salesSku.append(row.skuNum)
+
+    # TandWPurchaseOrder
+    if skuRef == "all":
+        for row in dbSession.query(TandWPurchaseOrder):
+            salesQ.append(row.quantity)
+            salesDate.append(row.orderDate)
+            salesSku.append(row.skuNum)
+    else:
+        for row in dbSession.query(TandWPurchaseOrder):
+            if skuRef in row.skuNum:
+                salesQ.append(row.quantity)
+                salesDate.append(row.orderDate)
+                salesSku.append(row.skuNum)
+
+    # hardToFind
+    if skuRef == "all":
+        for row in dbSession.query(hardToFind):
+            salesQ.append(row.quantity)
+            salesDate.append(row.orderDate)
+            salesSku.append(row.skuNum)
+    else:
+        for row in dbSession.query(hardToFind):
+            if skuRef in row.skuNum:
+                salesQ.append(row.quantity)
+                salesDate.append(row.orderDate)
+                salesSku.append(row.skuNum)
+
+    # ordersExport
+    if skuRef == "all":
+        for row in dbSession.query(ordersExport):
+            salesQ.append(row.quantity)
+            salesDate.append(row.orderDate)
+            salesSku.append(row.skuNum)
+    else:
+        for row in dbSession.query(ordersExport):
+            if skuRef in row.skuNum:
+                salesQ.append(row.quantity)
+                salesDate.append(row.orderDate)
+                salesSku.append(row.skuNum)
+
+    # theActivePurchaseOrder
+    if skuRef == "all":
+        for row in dbSession.query(theActivePurchaseOrder):
+            salesQ.append(row.quantity)
+            salesDate.append(row.orderDate)
+            salesSku.append(row.skuNum)
+    else:
+        for row in dbSession.query(theActivePurchaseOrder):
+            if skuRef in row.skuNum:
+                salesQ.append(row.quantity)
+                salesDate.append(row.orderDate)
+                salesSku.append(row.skuNum)
+
+    #add to dataframe
+    salesDF = pd.DataFrame({"salesQ": salesQ,
+                           "Date": salesDate,
+                           "skuNum": salesSku})
+
+    #remove non dated values
+    salesDF = salesDF[salesDF['Date'] > datetime.datetime(2014,1,1,0,0,0).date()]
+
+    #add all numbers at the same date together
+    sumSales = []
+    for i in salesDF['Date'].unique():
+        sumSales.append(float(salesDF.salesQ[salesDF['Date']==i].sum()))
+
+    sumSalesDF = pd.DataFrame({"SumSales": sumSales,
+                               "Date": salesDF['Date'].unique()})
+
+    sumSalesDF.sort_values(by="Date", inplace=True)
+
+    # plt.plot(sumSalesDF['Date'], sumSalesDF['SumSales'])
+    # plt.show()
+
+
+    plt.hist(sumSalesDF['SumSales'], bins=100)
+    plt.title("Histogram of sales for " + skuRef)
+    plt.xlabel("Sales range")
+    plt.ylabel("Number of appearances")
+    # plt.show()
+
+    meanSales = sumSalesDF['SumSales'].mean()
+    print meanSales
+    # Appears to be poisson distributed
+    # pArray = np.random.poisson(meanSales, 1000)
+    # plt.hist(pArray)
+    # plt.show()
+
+
+    #Find the % a sale occurs on a day
+    saleOccurPercent = float(len(sumSalesDF['Date']))/(sumSalesDF['Date'].max()-sumSalesDF['Date'].min()).days
+    print saleOccurPercent
+
+
 
 def readStock():
     # stockdf = [instance for instance in dbSession.query(stockReports)]
@@ -188,4 +312,5 @@ if __name__ == '__main__':
     loadSession()
     connection = dbEngine.connect()
     # readStock()
-    readCosts()
+    # readCosts()
+    readSales("FTR")
