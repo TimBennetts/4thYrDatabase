@@ -24,10 +24,14 @@ dbSession = None
 filePath = "CAM MIKE DATA\B2B"
 filePath2 = "CAM MIKE DATA\Stock Reports"
 filePath3 = "CAM MIKE DATA\B2C"
+filePath4 = "CAM MIKE DATA\Costings"
 
 purchDirectory = os.path.abspath(os.path.join(filePath))
 stockDirectory = os.path.abspath(os.path.join(filePath2))
 salesDirectory = os.path.abspath(os.path.join(filePath3))
+costDirectory = os.path.abspath(os.path.join(filePath4))
+
+
 
 class theActivePurchaseOrder(Base):
     __tablename__ = 'theActivePurchaseOrders'
@@ -212,6 +216,26 @@ class stockReports(Base):
     frozenStock = Column(Integer)
     freeStock = Column(Integer)
     date = Column(Date)
+
+class warehouseInvoices(Base):
+    __tablename__ = 'warehouseInvoiceInfo'
+    orderNum = Column(String, primary_key=True)
+    # date = Column(Date)
+    # weight = Column(Float)
+    # volume = Column(Float)
+
+class freightInvoices(Base):
+    __tablename__ = 'freightInvoiceInfo'
+    orderNum = Column(String, primary_key=True)
+    date = Column(Date)
+    weight = Column(Float)
+    volume = Column(Float)
+    chargeable = Column(Float)
+    numShipped = Column(Integer)
+    ETD = Column(Date) # Estimated time departed
+    ETA = Column(Date) # Estimated time of arrival
+    totalCost = Column(Float)
+
 
 def createDB(dbname):
     global dbEngine
@@ -458,6 +482,41 @@ def readSales(salesDirectory):
             counter2 = counter2 + 1
     dbSession.commit()
 
+def readCostings(costDirectory):
+    print costDirectory
+    wsList = readFiles(costDirectory)
+    wsRange = []
+    headers = []
+    for ws in wsList:
+        list1, list2 = readSaleWs(ws)  # list1 = wsRange, list2 = headers
+        wsRange.append(list1)
+        headers.append(list2)
+
+    for i in range(len(wsRange)):
+         counter3 = 0
+         for j in range(len(wsRange[i])):
+            if i == 0: #Freight
+                FreightInvoiceInfo = freightInvoices(
+                    orderNum = counter3,
+                    date = dateTimeConv(wsRange[i][j][0].value),
+                    weight = wsRange[i][j][1].value,
+                    volume = wsRange[i][j][2].value,
+                    chargeable = wsRange[i][j][3].value,
+                    numShipped = wsRange[i][j][4].value,
+                    ETD = dateTimeConv(wsRange[i][j][5].value),  # Estimated time departed
+                    ETA = dateTimeConv(wsRange[i][j][6].value), # Estimated time of arrival
+                    totalCost = wsRange[i][j][7].value,
+                )
+                dbSession.add(FreightInvoiceInfo)
+
+            elif i == 1: #warehousing
+                WarehouseInvoiceInfo = warehouseInvoices(
+                    orderNum = counter3
+                )
+                dbSession.add(WarehouseInvoiceInfo)
+
+            counter3 += 1
+    dbSession.commit()
 
 
 def initialise():
@@ -473,6 +532,9 @@ def initialise():
   
   # Adding the sales files to the database
   readSales(salesDirectory)
+
+  # Adding the cost files to the database
+  readCostings(costDirectory)
 
 
 if __name__ == '__main__':

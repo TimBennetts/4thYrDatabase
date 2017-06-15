@@ -136,6 +136,9 @@ def dateTimeConv(xlDate):
     elif type(xlDate) == float:
         dateTuple = xldate_as_tuple(xlDate, 0)
         dt = datetime.datetime(*dateTuple[0:6])
+    else:
+        print xlDate
+        print type(xlDate)
     return dt
 
 
