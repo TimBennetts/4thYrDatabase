@@ -42,7 +42,7 @@ class theActivePurchaseOrder(Base):
     quantity = Column(Integer) #or total quantity
     costPrice = Column(Float) #exclude gst
     totalCost = Column(Float) #exclude gst
-    date = Column(Date)
+    orderDate = Column(Date)
     
     def __str__(self):
       theStr = "Order: " + str(self.orderNum)
@@ -64,7 +64,7 @@ class TandWPurchaseOrder(Base):
     quantity = Column(Integer)
     costPrice = Column(Float)
     totalCost = Column(Float)
-    agreedDeliveryDate = Column(Date)
+    orderDate = Column(Date)
     colour = Column(String)
     material = Column(String)
     itemDims = Column(String)
@@ -86,13 +86,13 @@ class OZPurchaseOrder(Base):
     costPrice = Column(Float)
     totalCost = Column(Float)
     skuNum = Column(String)
-    date = Column(Date)
+    orderDate = Column(Date)
 
 class SalesData(Base):
     __tablename__ = 'SalesData'
 
     saleID = Column(String, primary_key=True)
-    date = Column(Date)
+    orderDate = Column(Date)
     orderName = Column(String)
     transactionType = Column(String)
     saleType = Column(String)
@@ -108,7 +108,7 @@ class SalesData(Base):
     productVendor = Column(String)
     productTitle = Column(String)
     productVariantTitle = Column(String)
-    productVariantTitleSku = Column(String)
+    skuNum = Column(String)
     quantity = Column(Integer)
     costPrice = Column(Float)
     lineItemDiscount = Column(Float)
@@ -136,7 +136,7 @@ class hardToFind(Base):
     productVariation = Column(String)
     personalisation = Column(String)
     quantity = Column(Integer)
-    SKU = Column(String)
+    skuNum = Column(String)
     seller = Column(String)
     costPrice = Column(Float)
     subTotal = Column(Float)
@@ -162,12 +162,12 @@ class ordersExport(Base):
     discountCode = Column(String)
     discountAmount = Column(String)
     shippingMethod = Column(String)
-    timeEntryCreated = Column(Date)
-    lineitemQty = Column(Integer)
+    orderDate = Column(Date)
+    quantity = Column(Integer)
     lineitemName = Column(String)
     lineitemPrice = Column(Float)
     lineitemComparePrice = Column(String)  # what is this?
-    lineitemSku = Column(String)
+    skuNum = Column(String)
     lineitemReqShipping = Column(Boolean)
     lineitemTaxable = Column(Boolean)
     lineitemFulfillmentStatus = Column(String)
@@ -215,19 +215,36 @@ class stockReports(Base):
     picks = Column(Integer)
     frozenStock = Column(Integer)
     freeStock = Column(Integer)
-    date = Column(Date)
+    orderDate = Column(Date)
 
 class warehouseInvoices(Base):
     __tablename__ = 'warehouseInvoiceInfo'
     orderNum = Column(String, primary_key=True)
-    # date = Column(Date)
-    # weight = Column(Float)
-    # volume = Column(Float)
+    orderDate = Column(Date)
+    palletCount = Column(Integer)
+    shelvesQty = Column(Integer)
+    cartonsQty = Column(Integer)
+    packRateQty = Column(Integer)
+    inwardsRateQty = Column(Integer)
+    removeCoversQty = Column(Integer)
+    orderProcessingQty = Column(Integer)
+    stockReportQty = Column(Integer)
+    palletSpaceCost = Column(String)
+    shelvesCost = Column(Float)
+    cartonsInCost = Column(String)
+    packRateCost = Column(String)
+    inwardsRateCost = Column(String)
+    removeCoversCost = Column(String)
+    orderProcessingCost = Column(String)
+    stockReportCost = Column(String)
+    materialsCost = Column(Float)
+    transportCost = Column(Float)
+    totalCost = Column(Float)
 
 class freightInvoices(Base):
     __tablename__ = 'freightInvoiceInfo'
     orderNum = Column(String, primary_key=True)
-    date = Column(Date)
+    orderDate = Column(Date)
     weight = Column(Float)
     volume = Column(Float)
     chargeable = Column(Float)
@@ -276,7 +293,7 @@ def readPurchaseOrder(purchDirectory):
                     quantity = wsRange[i][j][1].value,
                     costPrice = wsRange[i][j][2].value,
                     totalCost = wsRange[i][j][3].value,
-                    date = dateTimeConv(wsRange[i][j][5].value)
+                    orderDate = dateTimeConv(wsRange[i][j][5].value)
                 )
                 dbSession.add(OZPurchOrder)
 
@@ -290,7 +307,7 @@ def readPurchaseOrder(purchDirectory):
                                                     quantity = wsRange[i][j][5].value,
                                                     costPrice = wsRange[i][j][6].value,
                                                     totalCost = wsRange[i][j][7].value,
-                                                    agreedDeliveryDate = dateTimeConv(wsRange[i][j][8].value),
+                                                    orderDate = dateTimeConv(wsRange[i][j][8].value),
                                                     colour = wsRange[i][j][9].value,
                                                     material = wsRange[i][j][10].value,
                                                     itemDims = wsRange[i][j][11].value,
@@ -312,7 +329,7 @@ def readPurchaseOrder(purchDirectory):
                                                             quantity = wsRange[i][j][2].value,  # or total quantity
                                                             costPrice = wsRange[i][j][3].value,  # exclude gst
                                                             totalCost = wsRange[i][j][4].value,  # exclude gst
-                                                            date = dateTimeConv(wsRange[i][j][5].value),
+                                                            orderDate = dateTimeConv(wsRange[i][j][5].value),
 
                 )
                 dbSession.add(theActivePurchOrder)
@@ -339,7 +356,7 @@ def readStockReports(stockDirectory):
                                     picks = wsRange[i][j][3].value,
                                     frozenStock = wsRange[i][j][4].value,
                                     freeStock = wsRange[i][j][5].value,
-                                    date = dateTimeConv(wsRange[i][j][6].value),
+                                    orderDate = dateTimeConv(wsRange[i][j][6].value),
                 )
             dbSession.add(stockReport)
             counter1 = counter1 + 1
@@ -376,7 +393,7 @@ def readSales(salesDirectory):
                                         productVariation = wsRange[i][j][12].value,
                                         personalisation = wsRange[i][j][13].value,
                                         quantity = wsRange[i][j][14].value,
-                                        SKU = wsRange[i][j][15].value,
+                                        skuNum = wsRange[i][j][15].value,
                                         seller = wsRange[i][j][16].value,
                                         costPrice = wsRange[i][j][17].value,
                                         subTotal = wsRange[i][j][18].value,
@@ -403,12 +420,12 @@ def readSales(salesDirectory):
                                             discountCode = wsRange[i][j][12].value,
                                             discountAmount = wsRange[i][j][13].value,
                                             shippingMethod = wsRange[i][j][14].value,
-                                            timeEntryCreated = dateTimeConv(wsRange[i][j][15].value),
-                                            lineitemQty = wsRange[i][j][16].value,
+                                            orderDate = dateTimeConv(wsRange[i][j][15].value),
+                                            quantity = wsRange[i][j][16].value,
                                             lineitemName = wsRange[i][j][17].value,
                                             lineitemPrice = wsRange[i][j][18].value,
                                             lineitemComparePrice = wsRange[i][j][19].value,  # what is this?
-                                            lineitemSku = wsRange[i][j][20].value,
+                                            skuNum = wsRange[i][j][20].value,
                                             lineitemReqShipping = wsRange[i][j][21].value,
                                             lineitemTaxable = wsRange[i][j][22].value,
                                             lineitemFulfillmentStatus = wsRange[i][j][23].value,
@@ -452,7 +469,7 @@ def readSales(salesDirectory):
             elif i == 2: # sales
                 salesdata = SalesData(
                                     saleID = wsRange[i][j][0].value,
-                                    date = dateTimeConv(wsRange[i][j][1].value),
+                                    orderDate = dateTimeConv(wsRange[i][j][1].value),
                                     orderName = wsRange[i][j][2].value,
                                     transactionType = wsRange[i][j][3].value,
                                     saleType = wsRange[i][j][4].value,
@@ -468,7 +485,7 @@ def readSales(salesDirectory):
                                     productVendor = wsRange[i][j][14].value,
                                     productTitle = wsRange[i][j][15].value,
                                     productVariantTitle = wsRange[i][j][16].value,
-                                    productVariantTitleSku = wsRange[i][j][17].value,
+                                    skuNum = wsRange[i][j][17].value,
                                     quantity = wsRange[i][j][18].value,
                                     costPrice = wsRange[i][j][19].value,
                                     lineItemDiscount = wsRange[i][j][20].value,
@@ -488,7 +505,7 @@ def readCostings(costDirectory):
     wsRange = []
     headers = []
     for ws in wsList:
-        list1, list2 = readSaleWs(ws)  # list1 = wsRange, list2 = headers
+        list1, list2 = readSaleWs(ws)
         wsRange.append(list1)
         headers.append(list2)
 
@@ -498,7 +515,7 @@ def readCostings(costDirectory):
             if i == 0: #Freight
                 FreightInvoiceInfo = freightInvoices(
                     orderNum = counter3,
-                    date = dateTimeConv(wsRange[i][j][0].value),
+                    orderDate = dateTimeConv(wsRange[i][j][0].value),
                     weight = wsRange[i][j][1].value,
                     volume = wsRange[i][j][2].value,
                     chargeable = wsRange[i][j][3].value,
@@ -511,7 +528,27 @@ def readCostings(costDirectory):
 
             elif i == 1: #warehousing
                 WarehouseInvoiceInfo = warehouseInvoices(
-                    orderNum = counter3
+                    orderNum = counter3,
+                    orderDate = dateTimeConv(wsRange[i][j][0].value),
+                    palletCount = wsRange[i][j][1].value,
+                    shelvesQty = wsRange[i][j][2].value,
+                    cartonsQty = wsRange[i][j][3].value,
+                    packRateQty = wsRange[i][j][4].value,
+                    inwardsRateQty = wsRange[i][j][5].value,
+                    removeCoversQty = wsRange[i][j][6].value,
+                    orderProcessingQty = wsRange[i][j][7].value,
+                    stockReportQty = wsRange[i][j][8].value,
+                    palletSpaceCost = wsRange[i][j][9].value,
+                    shelvesCost = wsRange[i][j][10].value,
+                    cartonsInCost = wsRange[i][j][11].value,
+                    packRateCost = wsRange[i][j][12].value,
+                    inwardsRateCost = wsRange[i][j][13].value,
+                    removeCoversCost = wsRange[i][j][14].value,
+                    orderProcessingCost = wsRange[i][j][15].value,
+                    stockReportCost = wsRange[i][j][16].value,
+                    materialsCost = wsRange[i][j][17].value,
+                    transportCost = wsRange[i][j][18].value,
+                    totalCost = wsRange[i][j][19].value
                 )
                 dbSession.add(WarehouseInvoiceInfo)
 
