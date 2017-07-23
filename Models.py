@@ -10,6 +10,7 @@ from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
 import datetime
+import scipy.stats as st
 
 
 def loadSession():
@@ -27,7 +28,7 @@ def loadSession():
     metadata = MetaData(dbEngine, reflect=True)
 
 
-def getSalesDF(skuRef):
+def getSalesDF(skuRef,dbSession):
     # pre-allocate arrays
     salesQ = []
     salesDate = []
@@ -157,12 +158,17 @@ def Costs():
     costDF['shippingTime'] = costDF['ETA'] - costDF['ETD']
     leadTime = costDF['shippingTime'].mean().days
 
+    #### use warehouse data ####
+
     return leadTime
 
 
 
 def calcDemand(skuRef, timeRange, method):
-    salesDF = getSalesDF(skuRef)
+    salesDF = getSalesDF(skuRef,dbSession)
+    leadTime = 15 # L in days
+    serviceLvl = 0.95 # service level (alpha):
+    zScore = st.norm.ppf(serviceLvl)
 
     #check sku
     if salesDF.empty:
@@ -186,14 +192,20 @@ def calcDemand(skuRef, timeRange, method):
     stdDevSales = sumSalesDF['SumSales'].std()
     # Find often a sale on a day occurs
     saleOccurPercent = float(len(sumSalesDF['Date'])) / (sumSalesDF['Date'].max() - sumSalesDF['Date'].min()).days
+    reorderPoint = int(math.ceil(meanDemand * leadTime))  # R, round up to nearest int
 
     if method == 1:
         methodDisc = "Deterministic demand"
         demand = [meanDemand] * timeRange
+        #Std dev = 0 so safety stock = 0 so reorder point =  normal
+        safetyStockLvl = 0
     elif method == 2:
         methodDisc = "poisson distribution"
         # find random poisson values
         demand = np.random.poisson(meanDemand, timeRange)
+        # find safety stock
+        safetyStockLvl = zScore*np.std(demand)*np.sqrt(leadTime)
+
     elif method == 3:
         methodDisc = "poisson distribution with uniform occurrence"
         demand = [0] * timeRange
@@ -204,6 +216,10 @@ def calcDemand(skuRef, timeRange, method):
                 demand[t] = float(np.random.poisson(meanSales, 1))
 
         meanDemand = float(sum(demand)) / len(demand)
+
+        #### adding in confidence intervals/safety stock ####
+        safetyStockLvl = zScore * np.std(demand) * np.sqrt(leadTime)
+
     elif method == 4:
         methodDisc = "normal distribution with uniform occurrence"
         demand = [0] * timeRange
@@ -214,11 +230,17 @@ def calcDemand(skuRef, timeRange, method):
                 demand[t] = int(np.random.normal(meanSales, stdDevSales, 1))
 
         meanDemand = int(sum(demand)) / len(demand)
+
+        #### adding in confidence intervals/safety stock ####
+        safetyStockLvl = zScore * np.std(demand) * np.sqrt(leadTime)
+
     else:
         print "Method not chosen"
         return
 
-    return demand, meanDemand, methodDisc
+    reorderPoint = math.ceil(reorderPoint + safetyStockLvl)
+
+    return demand, meanDemand, methodDisc, reorderPoint
 
 #
 #
@@ -322,18 +344,19 @@ def EOCModel(skuRef, distMethod):
     timeRange = 2*365 # in days, arbitary
 
     #Find demand
-    demand, meanDemand, methodDisc = calcDemand(skuRef, timeRange, distMethod)
+    demand, meanDemand, methodDisc, reorderPoint = calcDemand(skuRef, timeRange, distMethod)
     if demand[0] == None: #D, number of items sold per day, the quantity currently in stock
         return
 
     Qstar = math.ceil(math.sqrt(2*meanDemand*fixedCost/holdCost)) #optimal order quantity Q*
-    reorderPoint = int(math.ceil(meanDemand*leadTime)) #R, round up to nearest int
+
     #allocate/initialise
     quantity = [0] * timeRange
     reordered = False
     quantity[0] = initialQ
     arrivalTime = 0
     missedSales = 0
+
 
     for t in range(1,timeRange):
         quantity[t] += quantity[t-1]-demand[t] #quantity[t] should be 0 unless a reorder has been made
@@ -351,7 +374,7 @@ def EOCModel(skuRef, distMethod):
 
     totalCost = (fixedCost*meanDemand/Qstar) + (prodCost*meanDemand) + (0.5*Qstar*holdCost)
 
-    plotString = ("Missed sales: " + str(missedSales) + "," + " Total cost: " + str(totalCost))
+    plotString = ("Missed sales: " + str(missedSales) + "," + " reorder quantity: " + str(reorderPoint))
     print plotString
 
     plt.plot(range(timeRange),quantity)
@@ -362,6 +385,7 @@ def EOCModel(skuRef, distMethod):
     plt.text(timeRange/8, initialQ, plotString)
     plt.show()
 
+    return quantity, timeRange
 
 if __name__ == '__main__':
     loadSession()
@@ -369,5 +393,5 @@ if __name__ == '__main__':
     skuRef = "FTR"
     # skuRef = "all"
     distMethod = 4 #1 = deterministic, 2 = poisson, 3 = occurrence + poisson, 4 = occurrence + normal
-    EOCModel(skuRef, distMethod)
+    quantity, timeRange = EOCModel(skuRef, distMethod, dbSession)
     # leadTime = Costs()

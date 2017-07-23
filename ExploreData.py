@@ -140,89 +140,92 @@ def loadSession():
     conn = dbEngine.connect()
     metadata = MetaData(dbEngine, reflect=True)
 
-def readSales(skuRef):
+def readSales(skuRef, orderType):
     # pre-allocate arrays
     salesQ = []
     salesDate = []
     salesSku = []
 
-    #OZPurchaseOrder
-    if skuRef == "all":
-        for row in dbSession.query(OZPurchaseOrder):
-            salesQ.append(row.quantity)
-            salesDate.append(row.orderDate)
-            salesSku.append(row.skuNum)
-    else:
-        for row in dbSession.query(OZPurchaseOrder):
-            if skuRef in row.skuNum:
-                salesQ.append(row.quantity)
-                salesDate.append(row.orderDate)
-                salesSku.append(row.skuNum)
 
-    # SalesData
-    if skuRef == "all":
-        for row in dbSession.query(SalesData):
-            salesQ.append(row.quantity)
-            salesDate.append(row.orderDate)
-            salesSku.append(row.skuNum)
-    else:
-        for row in dbSession.query(SalesData):
-            if skuRef in row.skuNum:
+    if orderType == 1 or orderType == 2: #Order types: 1 = all, 2 = B2B, 3 = B2C
+        #OZPurchaseOrder
+        if skuRef == "all":
+            for row in dbSession.query(OZPurchaseOrder):
                 salesQ.append(row.quantity)
                 salesDate.append(row.orderDate)
                 salesSku.append(row.skuNum)
+        else:
+            for row in dbSession.query(OZPurchaseOrder):
+                if skuRef in row.skuNum:
+                    salesQ.append(row.quantity)
+                    salesDate.append(row.orderDate)
+                    salesSku.append(row.skuNum)
 
-    # TandWPurchaseOrder
-    if skuRef == "all":
-        for row in dbSession.query(TandWPurchaseOrder):
-            salesQ.append(row.quantity)
-            salesDate.append(row.orderDate)
-            salesSku.append(row.skuNum)
-    else:
-        for row in dbSession.query(TandWPurchaseOrder):
-            if skuRef in row.skuNum:
+        # TandWPurchaseOrder
+        if skuRef == "all":
+            for row in dbSession.query(TandWPurchaseOrder):
                 salesQ.append(row.quantity)
                 salesDate.append(row.orderDate)
                 salesSku.append(row.skuNum)
+        else:
+            for row in dbSession.query(TandWPurchaseOrder):
+                if skuRef in row.skuNum:
+                    salesQ.append(row.quantity)
+                    salesDate.append(row.orderDate)
+                    salesSku.append(row.skuNum)
 
-    # hardToFind
-    if skuRef == "all":
-        for row in dbSession.query(hardToFind):
-            salesQ.append(row.quantity)
-            salesDate.append(row.orderDate)
-            salesSku.append(row.skuNum)
-    else:
-        for row in dbSession.query(hardToFind):
-            if skuRef in row.skuNum:
+        # theActivePurchaseOrder
+        if skuRef == "all":
+            for row in dbSession.query(theActivePurchaseOrder):
                 salesQ.append(row.quantity)
                 salesDate.append(row.orderDate)
                 salesSku.append(row.skuNum)
+        else:
+            for row in dbSession.query(theActivePurchaseOrder):
+                if skuRef in row.skuNum:
+                    salesQ.append(row.quantity)
+                    salesDate.append(row.orderDate)
+                    salesSku.append(row.skuNum)
+    if orderType ==1 or orderType == 3:
+        # hardToFind
+        if skuRef == "all":
+            for row in dbSession.query(hardToFind):
+                salesQ.append(row.quantity)
+                salesDate.append(row.orderDate)
+                salesSku.append(row.skuNum)
+        else:
+            for row in dbSession.query(hardToFind):
+                if skuRef in row.skuNum:
+                    salesQ.append(row.quantity)
+                    salesDate.append(row.orderDate)
+                    salesSku.append(row.skuNum)
 
-    # ordersExport
-    if skuRef == "all":
-        for row in dbSession.query(ordersExport):
-            salesQ.append(row.quantity)
-            salesDate.append(row.orderDate)
-            salesSku.append(row.skuNum)
-    else:
-        for row in dbSession.query(ordersExport):
-            if skuRef in row.skuNum:
+        # ordersExport
+        if skuRef == "all":
+            for row in dbSession.query(ordersExport):
                 salesQ.append(row.quantity)
                 salesDate.append(row.orderDate)
                 salesSku.append(row.skuNum)
+        else:
+            for row in dbSession.query(ordersExport):
+                if skuRef in row.skuNum:
+                    salesQ.append(row.quantity)
+                    salesDate.append(row.orderDate)
+                    salesSku.append(row.skuNum)
 
-    # theActivePurchaseOrder
-    if skuRef == "all":
-        for row in dbSession.query(theActivePurchaseOrder):
-            salesQ.append(row.quantity)
-            salesDate.append(row.orderDate)
-            salesSku.append(row.skuNum)
-    else:
-        for row in dbSession.query(theActivePurchaseOrder):
-            if skuRef in row.skuNum:
+        # SalesData
+        if skuRef == "all":
+            for row in dbSession.query(SalesData):
                 salesQ.append(row.quantity)
                 salesDate.append(row.orderDate)
                 salesSku.append(row.skuNum)
+        else:
+            for row in dbSession.query(SalesData):
+                if skuRef in row.skuNum:
+                    salesQ.append(row.quantity)
+                    salesDate.append(row.orderDate)
+                    salesSku.append(row.skuNum)
+
 
     #add to dataframe
     salesDF = pd.DataFrame({"salesQ": salesQ,
@@ -231,6 +234,10 @@ def readSales(skuRef):
 
     #remove non dated values
     salesDF = salesDF[salesDF['Date'] > datetime.datetime(2014,1,1,0,0,0).date()]
+
+    return salesDF
+
+def sumSales(salesDF):
 
     #add all numbers at the same date together
     sumSales = []
@@ -246,11 +253,11 @@ def readSales(skuRef):
     # plt.show()
 
 
-    plt.hist(sumSalesDF['SumSales'], bins=100)
-    plt.title("Histogram of sales for " + skuRef)
-    plt.xlabel("Sales range")
-    plt.ylabel("Number of appearances")
-    # plt.show()
+    # plt.hist(sumSalesDF['SumSales'], bins=100)
+    # plt.title("Histogram of sales for " + skuRef)
+    # plt.xlabel("Sales range")
+    # plt.ylabel("Number of appearances")
+    # # plt.show()
 
     meanSales = sumSalesDF['SumSales'].mean()
     print meanSales
@@ -264,9 +271,10 @@ def readSales(skuRef):
     saleOccurPercent = float(len(sumSalesDF['Date']))/(sumSalesDF['Date'].max()-sumSalesDF['Date'].min()).days
     print saleOccurPercent
 
+    return salesDF
 
 
-def readStock():
+def readStock(skuRef):
     # stockdf = [instance for instance in dbSession.query(stockReports)]
 
     #pre-allocate arrays
@@ -297,15 +305,72 @@ def readStock():
 
   # Single graph
     for row in dbSession.query(stockReports).order_by(stockReports.date.desc()):
-        if row.skuNum == 'FTRWOODGRAI':
-            stockFreeStock.append(row.freeStock)
+        if skuRef in row.skuNum:
+            stockQty.append(row.freeStock)
             stockDate.append(row.date)
+            stockSku.append(row.skuNum)
 
-    plt.plot(stockDate, stockFreeStock, '.-')
-    plt.xlabel("Dates")
-    plt.ylabel("Stock level")
-    plt.title("Stock level for FTR-WOODGRAIN")
-    plt.show()
+    stockDF = pd.DataFrame({"StockQty": stockQty,
+                            "Date": stockDate,
+                            "skuNum": stockSku})
+
+    return stockDF
+
+def timeSinceOrder(salesDF):
+    # need to create time since order array and amount ordered array for both B2C and B2B orders
+
+    # add all numbers at the same date together
+    sumSales = []
+    for i in salesDF['Date'].unique():
+        sumSales.append(float(salesDF.salesQ[salesDF['Date'] == i].sum()))
+
+    sumSalesDF = pd.DataFrame({"SumSales": sumSales,
+                               "Date": salesDF['Date'].unique()})
+
+    sumSalesDF.sort_values(by="Date", inplace=True)
+
+    timeOrderDiff = [0] #add a 0 to start to make even size w quantity list
+
+    for i in sumSalesDF['Date']:
+        if i == sumSalesDF['Date'].min():
+            lastOrderDate = i
+        else:
+            timeOrderDiff.append((i-lastOrderDate).days)
+            lastOrderDate = i
+
+
+    #Plot the freq of time diff
+    plt.hist(timeOrderDiff, bins = 20)
+    plt.xlabel("Difference in time")
+    plt.ylabel("Frequency")
+    plt.title("Histogram of time between orders")
+    # plt.show()
+
+
+    # Plot the freq of amount
+    plt.hist(sumSalesDF['SumSales'], bins = 20)
+    plt.xlabel("Sales amount")
+    plt.ylabel("Frequency")
+    plt.title("Histogram of sales amount")
+    # plt.show()
+
+
+    # Plot time diff vs amount
+    plt.scatter(timeOrderDiff, sumSalesDF['SumSales'])
+    plt.xlabel("Time difference")
+    plt.ylabel("Quantity ordered")
+    plt.title("Distribution of sale times")
+    # plt.show()
+
+
+
+    csvFile = pd.DataFrame({"SalesQty": sumSalesDF["SumSales"],
+                            "TimeBetweenOrders": timeOrderDiff,
+                            "Date": sumSalesDF["Date"]})
+    # csvFile.to_csv('AllSales.csv', sep=',')
+    # sumSalesDF.to_csv('SummedSalesData.csv', sep=',')
+
+    return csvFile
 
 
 if __name__ == '__main__':
@@ -313,4 +378,12 @@ if __name__ == '__main__':
     connection = dbEngine.connect()
     # readStock()
     # readCosts()
-    readSales("FTR")
+    # sumSales(salesDF)
+    B2CsalesDF = readSales("FTR",3)
+    B2BsalesDF = readSales("FTR",2)
+    B2CCsv = timeSinceOrder(B2CsalesDF)
+    B2BCsv = timeSinceOrder(B2BsalesDF)
+    B2CCsv.to_csv('B2CData.csv', sep=',')
+    B2BCsv.to_csv('B2BData.csv', sep=',')
+    B2CsalesDF.to_csv("B2CRawData.csv", sep=',')
+    B2BsalesDF.to_csv("B2BRawData.csv", sep=',')

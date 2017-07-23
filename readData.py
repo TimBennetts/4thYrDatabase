@@ -130,13 +130,22 @@ def dateTimeConv(xlDate):
                     try:
                         dt = datetime.datetime.strptime(xlDate, "%m/%d/%y")
                     except ValueError:
-                        print(xlDate)
-                        print(type(xlDate))
+                        try:
+                            if "T" in xlDate:
+                                xlDate = xlDate.replace("T", " ")
+                                xlDate = xlDate.replace("Z", "")
+                                xlDate = xlDate[0:10]
+                                dt = datetime.datetime.strptime(xlDate, "%Y-%m-%d")
+
+                        except ValueError as detail:
+                            print detail
+                            print xlDate
 
     elif type(xlDate) == float:
         dateTuple = xldate_as_tuple(xlDate, 0)
         dt = datetime.datetime(*dateTuple[0:6])
     else:
+        print "else:"
         print xlDate
         print type(xlDate)
     return dt
