@@ -555,24 +555,88 @@ def readCostings(costDirectory):
             counter3 += 1
     dbSession.commit()
 
+def loadSession():
+    global dbEngine
+    global dbSession
+    global m
+    global conn
+
+    dbname = "BBBYO.db"
+    dbEngine = create_engine('sqlite:///' + dbname, echo=False)
+    Session = sessionmaker()
+    Session.configure(bind=dbEngine)
+    dbSession = Session()
+    conn = dbEngine.connect()
+    m = MetaData(dbEngine, reflect=True)
+
+def skuCompletion():
+    # salesDF = readSales(skuRef = "all", orderType = 1)
+
+    #load session
+    loadSession()
+
+    # # Get db table names
+    # dbTables = []
+    # m.reflect(dbEngine)
+    # for table in m.tables.values():
+    #     dbTables.append(table.name)
+    # Find the incomplete lists
+    # incompSkus = []
+    # for i in dbTables:
+    #     count = 0
+    #     skuCount = 0
+    #     print i
+    #     print type(i)
+    #     print type(i.decode('utf-8'))
+    #     for row in dbSession.query(i.decode('utf-8')):
+    #         # Count entries
+    #         count += 1
+    #         # Count number of sku entries
+    #         if row.skuNum != "":
+    #             skuCount += 1
+    #     if skuCount != count:
+    #         incompSkus.append(i)
+
+    for row in dbSession.query(hardToFind):
+            if "fb" in row.productName.lower() or "future" in row.productName.lower():
+                row.skuNum = "ftr"
+                dbSession.commit()
+
+    for row in dbSession.query(SalesData):
+        if row.skuNum == "":
+            if "fb" in row.productTitle.lower() or "future" in row.productTitle.lower():
+                row.skuNum = "ftr"
+                dbSession.commit()
+
+
+    for row in dbSession.query(ordersExport):
+        if row.skuNum == "":
+            if "fb" in row.lineitemName.lower() or "future" in row.lineitemName.lower():
+                row.skuNum = "ftr"
+                dbSession.commit()
+
+
+
 
 def initialise():
-  createDB(dbname)
-  # Adding the purchase order files into the database
-  for subDirs, dirs, files in os.walk(purchDirectory):
-      if subDirs != purchDirectory:
-          # print subDirs
-          readPurchaseOrder(subDirs)
-  
-  # Adding the stock reports to the database
-  readStockReports(stockDirectory)
-  
-  # Adding the sales files to the database
-  readSales(salesDirectory)
+    # createDB(dbname)
+    # # Adding the purchase order files into the database
+    # for subDirs, dirs, files in os.walk(purchDirectory):
+    #     if subDirs != purchDirectory:
+    #         # print subDirs
+    #         readPurchaseOrder(subDirs)
+    #
+    # # Adding the stock reports to the database
+    # readStockReports(stockDirectory)
+    #
+    # # Adding the sales files to the database
+    # readSales(salesDirectory)
+    #
+    # # Adding the cost files to the database
+    # readCostings(costDirectory)
 
-  # Adding the cost files to the database
-  readCostings(costDirectory)
-
+    # Add skus for incomplete lists
+    skuCompletion()
 
 if __name__ == '__main__':
   initialise()

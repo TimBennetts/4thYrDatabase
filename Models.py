@@ -332,7 +332,7 @@ def findCurrentQ(skuRef):
     return initialQ
 
 
-def EOCModel(skuRef, distMethod):
+def EOCModel(skuRef, distMethod, dbSession):
     # initial variables - time in days
     prodCost = 4.25+1 #P production + transport costin USD, from email from Don
     initialQ = findCurrentQ(skuRef)
@@ -392,6 +392,6 @@ if __name__ == '__main__':
     # skuRef = "FTRWOODGRAI"
     skuRef = "FTR"
     # skuRef = "all"
-    distMethod = 4 #1 = deterministic, 2 = poisson, 3 = occurrence + poisson, 4 = occurrence + normal
+    distMethod = 1 #1 = deterministic, 2 = poisson, 3 = occurrence + poisson, 4 = occurrence + normal
     quantity, timeRange = EOCModel(skuRef, distMethod, dbSession)
     # leadTime = Costs()

@@ -140,6 +140,8 @@ def loadSession():
     conn = dbEngine.connect()
     metadata = MetaData(dbEngine, reflect=True)
 
+    return conn
+
 def readSales(skuRef, orderType):
     # pre-allocate arrays
     salesQ = []
@@ -156,7 +158,7 @@ def readSales(skuRef, orderType):
                 salesSku.append(row.skuNum)
         else:
             for row in dbSession.query(OZPurchaseOrder):
-                if skuRef in row.skuNum:
+                if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
@@ -169,7 +171,7 @@ def readSales(skuRef, orderType):
                 salesSku.append(row.skuNum)
         else:
             for row in dbSession.query(TandWPurchaseOrder):
-                if skuRef in row.skuNum:
+                if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
@@ -182,7 +184,7 @@ def readSales(skuRef, orderType):
                 salesSku.append(row.skuNum)
         else:
             for row in dbSession.query(theActivePurchaseOrder):
-                if skuRef in row.skuNum:
+                if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
@@ -195,7 +197,7 @@ def readSales(skuRef, orderType):
                 salesSku.append(row.skuNum)
         else:
             for row in dbSession.query(hardToFind):
-                if skuRef in row.skuNum:
+                if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
@@ -208,7 +210,7 @@ def readSales(skuRef, orderType):
                 salesSku.append(row.skuNum)
         else:
             for row in dbSession.query(ordersExport):
-                if skuRef in row.skuNum:
+                if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
@@ -221,7 +223,7 @@ def readSales(skuRef, orderType):
                 salesSku.append(row.skuNum)
         else:
             for row in dbSession.query(SalesData):
-                if skuRef in row.skuNum:
+                if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
@@ -237,7 +239,7 @@ def readSales(skuRef, orderType):
 
     return salesDF
 
-def sumSales(salesDF):
+def sumSales(salesDF, skuRef):
 
     #add all numbers at the same date together
     sumSales = []
@@ -253,11 +255,11 @@ def sumSales(salesDF):
     # plt.show()
 
 
-    # plt.hist(sumSalesDF['SumSales'], bins=100)
-    # plt.title("Histogram of sales for " + skuRef)
-    # plt.xlabel("Sales range")
-    # plt.ylabel("Number of appearances")
-    # # plt.show()
+    plt.hist(sumSalesDF['SumSales'], bins=100)
+    plt.title("Histogram of sales for " + skuRef)
+    plt.xlabel("Sales range")
+    plt.ylabel("Number of appearances")
+    # plt.show()
 
     meanSales = sumSalesDF['SumSales'].mean()
     print meanSales
@@ -278,8 +280,9 @@ def readStock(skuRef):
     # stockdf = [instance for instance in dbSession.query(stockReports)]
 
     #pre-allocate arrays
-    stockFreeStock = []
+    stockQty = []
     stockDate = []
+    stockSku = []
     uniqueSku = []
     count = 0
     for sku in dbSession.query(stockReports.skuNum).distinct():
@@ -304,17 +307,23 @@ def readStock(skuRef):
     # plt.show()
 
   # Single graph
-    for row in dbSession.query(stockReports).order_by(stockReports.date.desc()):
-        if skuRef in row.skuNum:
+    for row in dbSession.query(stockReports).order_by(stockReports.orderDate.desc()):
+        if skuRef.lower() in row.skuNum.lower():
             stockQty.append(row.freeStock)
-            stockDate.append(row.date)
+            stockDate.append(row.orderDate)
             stockSku.append(row.skuNum)
 
     stockDF = pd.DataFrame({"StockQty": stockQty,
                             "Date": stockDate,
                             "skuNum": stockSku})
 
-    return stockDF
+    plt.plot(stockDate, stockQty)
+    plt.xlabel("Dates")
+    plt.ylabel("Stock level")
+    plt.title("Stock level for FTR items")
+    plt.show()
+
+    # return stockDF
 
 def timeSinceOrder(salesDF):
     # need to create time since order array and amount ordered array for both B2C and B2B orders
@@ -376,13 +385,15 @@ def timeSinceOrder(salesDF):
 if __name__ == '__main__':
     loadSession()
     connection = dbEngine.connect()
-    # readStock()
+    # readStock(skuRef='FTR')
     # readCosts()
-    # sumSales(salesDF)
+    salesDF = readSales("ftr",1)
+    sumSales(salesDF, "ftr")
     B2CsalesDF = readSales("FTR",3)
     B2BsalesDF = readSales("FTR",2)
     B2CCsv = timeSinceOrder(B2CsalesDF)
     B2BCsv = timeSinceOrder(B2BsalesDF)
+
     B2CCsv.to_csv('B2CData.csv', sep=',')
     B2BCsv.to_csv('B2BData.csv', sep=',')
     B2CsalesDF.to_csv("B2CRawData.csv", sep=',')
