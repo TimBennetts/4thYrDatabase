@@ -4,6 +4,7 @@ import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
 import datetime
 from dateutil import parser
+import csv
 
 Base = declarative_base()
 
@@ -150,10 +151,38 @@ def dateTimeConv(xlDate):
         print type(xlDate)
     return dt
 
+def readWarehouse(inputDir):
+
+    #initialise
+    fileList = []
+
+    # Import warehouse csvs
+    for root, dirs, files in os.walk(inputDir):
+        for file in files:
+            print files
+            print file
+            if file.endswith(".csv"):
+                with open(file) as f:
+                    readCSV = csv.reader(f, delimiter=',')
+                    fileList.append(readCSV)
+    print fileList
+    for row in fileList[0]:
+        print row
 
 
+        # Input into DF
 
+    # Do stuff
 
+    # Calculate costs
+
+    # Win
+
+if __name__ == '__main__':
+    filePath = "CAM MIKE DATA\Costings\Warehouse"
+    inputDir = os.path.abspath(os.path.join(filePath))
+
+    readWarehouse(inputDir)
 
 
 

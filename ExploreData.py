@@ -147,6 +147,7 @@ def readSales(skuRef, orderType):
     salesQ = []
     salesDate = []
     salesSku = []
+    purchRef = []
 
 
     if orderType == 1 or orderType == 2: #Order types: 1 = all, 2 = B2B, 3 = B2C
@@ -156,12 +157,14 @@ def readSales(skuRef, orderType):
                 salesQ.append(row.quantity)
                 salesDate.append(row.orderDate)
                 salesSku.append(row.skuNum)
+                purchRef.append("Oz")
         else:
             for row in dbSession.query(OZPurchaseOrder):
                 if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
+                    purchRef.append("Oz")
 
         # TandWPurchaseOrder
         if skuRef == "all":
@@ -169,12 +172,14 @@ def readSales(skuRef, orderType):
                 salesQ.append(row.quantity)
                 salesDate.append(row.orderDate)
                 salesSku.append(row.skuNum)
+                purchRef.append("TnW")
         else:
             for row in dbSession.query(TandWPurchaseOrder):
                 if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
+                    purchRef.append("TnW")
 
         # theActivePurchaseOrder
         if skuRef == "all":
@@ -182,12 +187,15 @@ def readSales(skuRef, orderType):
                 salesQ.append(row.quantity)
                 salesDate.append(row.orderDate)
                 salesSku.append(row.skuNum)
+                purchRef.append("Active")
         else:
             for row in dbSession.query(theActivePurchaseOrder):
                 if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
+                    purchRef.append("Active")
+
     if orderType ==1 or orderType == 3:
         # hardToFind
         if skuRef == "all":
@@ -195,12 +203,14 @@ def readSales(skuRef, orderType):
                 salesQ.append(row.quantity)
                 salesDate.append(row.orderDate)
                 salesSku.append(row.skuNum)
+                purchRef.append("B2C")
         else:
             for row in dbSession.query(hardToFind):
                 if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
+                    purchRef.append("B2C")
 
         # ordersExport
         if skuRef == "all":
@@ -208,12 +218,14 @@ def readSales(skuRef, orderType):
                 salesQ.append(row.quantity)
                 salesDate.append(row.orderDate)
                 salesSku.append(row.skuNum)
+                purchRef.append("B2C")
         else:
             for row in dbSession.query(ordersExport):
                 if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
+                    purchRef.append("B2C")
 
         # SalesData
         if skuRef == "all":
@@ -221,23 +233,37 @@ def readSales(skuRef, orderType):
                 salesQ.append(row.quantity)
                 salesDate.append(row.orderDate)
                 salesSku.append(row.skuNum)
+                purchRef.append("B2C")
         else:
             for row in dbSession.query(SalesData):
                 if skuRef.lower() in row.skuNum.lower():
                     salesQ.append(row.quantity)
                     salesDate.append(row.orderDate)
                     salesSku.append(row.skuNum)
+                    purchRef.append("B2C")
 
 
     #add to dataframe
     salesDF = pd.DataFrame({"salesQ": salesQ,
                            "Date": salesDate,
-                           "skuNum": salesSku})
+                           "skuNum": salesSku,
+                            "purchRef": purchRef})
 
     #remove non dated values
     salesDF = salesDF[salesDF['Date'] > datetime.datetime(2014,1,1,0,0,0).date()]
 
     return salesDF
+
+def plotSales(salesDF, skuRef):
+    # This function plots the sales for a product and plots it over time
+    salesDF.sort_values(by="Date", inplace=True)
+    plt.plot(salesDF['Date'], salesDF['salesQ'])
+    plt.xlabel("Dates")
+    plt.ylabel("Sales level")
+    plt.title("Sales level for " + str(skuRef) + " items")
+    # plt.title("Sales level for Wood Grain Future bottles")
+    plt.show()
+
 
 def sumSales(salesDF, skuRef):
 
@@ -262,7 +288,7 @@ def sumSales(salesDF, skuRef):
     # plt.show()
 
     meanSales = sumSalesDF['SumSales'].mean()
-    print meanSales
+    # print meanSales
     # Appears to be poisson distributed
     # pArray = np.random.poisson(meanSales, 1000)
     # plt.hist(pArray)
@@ -271,7 +297,7 @@ def sumSales(salesDF, skuRef):
 
     #Find the % a sale occurs on a day
     saleOccurPercent = float(len(sumSalesDF['Date']))/(sumSalesDF['Date'].max()-sumSalesDF['Date'].min()).days
-    print saleOccurPercent
+    # print saleOccurPercent
 
     return salesDF
 
@@ -284,6 +310,7 @@ def readStock(skuRef):
     stockDate = []
     stockSku = []
     uniqueSku = []
+    sumStock = []
     count = 0
     for sku in dbSession.query(stockReports.skuNum).distinct():
         uniqueSku.append(sku.skuNum)
@@ -317,13 +344,16 @@ def readStock(skuRef):
                             "Date": stockDate,
                             "skuNum": stockSku})
 
-    plt.plot(stockDate, stockQty)
+    for date in stockDF.Date.unique():
+        sumStock.append(sum(stockDF.StockQty[stockDF.Date==date]))
+
+    plt.plot(stockDF.Date.unique(), sumStock)
     plt.xlabel("Dates")
     plt.ylabel("Stock level")
     plt.title("Stock level for FTR items")
     plt.show()
 
-    # return stockDF
+    return stockDF
 
 def timeSinceOrder(salesDF):
     # need to create time since order array and amount ordered array for both B2C and B2B orders
@@ -381,20 +411,108 @@ def timeSinceOrder(salesDF):
 
     return csvFile
 
+def plotTotSales(B2CsalesDF, B2BsalesDF, salesDF):
+    # Find dates/days
+    startDate = min(salesDF['Date'])
+    # print startDate
+    stopDate = max(salesDF['Date'])
+    # print stopDate
+    lengthDays = (stopDate-startDate).days
+    print lengthDays # 1162
+    # print type(lengthDays)
+
+    # Pre-allocate array
+    totSales = []
+    B2CTotSales = []
+    B2BTotSales = []
+    cumulSales = 0
+    cumulB2C = 0
+    cumulB2B = 0
+
+    # Loop through time
+    for i in range(lengthDays+1):
+        # print startDate + datetime.timedelta(i)
+        # Sum total sales
+        #cumulate sales
+        cumulSales += salesDF.salesQ[salesDF['Date']==(startDate+datetime.timedelta(i))].sum()
+        #Add to array
+        totSales.append(cumulSales)
+        # B2C cumulative sales
+        cumulB2C += B2CsalesDF.salesQ[B2CsalesDF['Date']==(startDate+datetime.timedelta(i))].sum()
+        B2CTotSales.append(cumulB2C)
+        #B2B cumulative sales
+        cumulB2B += B2BsalesDF.salesQ[B2BsalesDF['Date']==(startDate+datetime.timedelta(i))].sum()
+        B2BTotSales.append(cumulB2B)
+
+    plt.plot(range(lengthDays+1),totSales, 'r')
+    plt.plot(range(lengthDays+1), B2CTotSales, 'b')
+    plt.plot(range(lengthDays+1), B2BTotSales, 'g')
+    plt.ylabel("cumulative sales volume")
+    plt.xlabel("Time in days")
+    plt.title("Sales volume over time")
+    plt.xlim([0,lengthDays+25])
+    # plt.show()
+
+    return totSales, B2BTotSales, B2CTotSales, lengthDays
+
+def splitSales(salesDF):
+    ozDF = salesDF[salesDF.purchRef == "Oz"]
+    twDF = salesDF[salesDF.purchRef == "TnW"]
+    activeDF = salesDF[salesDF.purchRef == "Active"]
+    B2CsalesDF = salesDF[salesDF.purchRef == "B2C"]
+
+    return ozDF, twDF, activeDF, B2CsalesDF
+
+def plotSplitSales(ozDF, twDF, activeDF, B2CsalesDF):
+    # Get an equal x axis
+    startDate = min(min(ozDF['Date']), min(twDF['Date']), min(activeDF['Date']), min(B2CsalesDF['Date']))
+    lastDate = max(max(ozDF['Date']), max(twDF['Date']), max(activeDF['Date']), max(B2CsalesDF['Date']))
+    lengthDays = (lastDate-startDate).days
+
+    # Pre-allocate arrays
+    ozTot =[]
+    twTot = []
+    activeTot = []
+    B2CTot = []
+    ozCumul = 0
+    twCumul = 0
+    activeCumul = 0
+    B2CCumul = 0
+
+    # Create cumulative sales
+    for i in range(lengthDays+1):
+        ozCumul += ozDF.salesQ[ozDF['Date']==(startDate+datetime.timedelta(i))].sum()
+        twCumul += twDF.salesQ[twDF['Date']==(startDate+datetime.timedelta(i))].sum()
+        activeCumul += activeDF.salesQ[activeDF['Date']==(startDate+datetime.timedelta(i))].sum()
+        B2CCumul += B2CsalesDF.salesQ[B2CsalesDF['Date']==(startDate+datetime.timedelta(i))].sum()
+        ozTot.append(ozCumul)
+        twTot.append(twCumul)
+        activeTot.append(activeCumul)
+        B2CTot.append(B2CCumul)
+
+    plt.plot(range(lengthDays + 1), ozTot, 'r')
+    plt.plot(range(lengthDays + 1), twTot, 'b')
+    plt.plot(range(lengthDays + 1), activeTot, 'g')
+    plt.plot(range(lengthDays + 1), B2CTot, 'c')
+    plt.ylabel("cumulative sales volume")
+    plt.xlabel("Time in days")
+    plt.title("Sales volume over time")
+    plt.xlim([0, lengthDays + 25])
+    plt.legend(["Oz", "T&W", "Active", "B2C"])
+    plt.show()
+
 
 if __name__ == '__main__':
     loadSession()
     connection = dbEngine.connect()
-    # readStock(skuRef='FTR')
+    # skuRef = "all"
+    readStock(skuRef='ftr')
     # readCosts()
-    salesDF = readSales("ftr",1)
-    sumSales(salesDF, "ftr")
-    B2CsalesDF = readSales("FTR",3)
-    B2BsalesDF = readSales("FTR",2)
-    B2CCsv = timeSinceOrder(B2CsalesDF)
-    B2BCsv = timeSinceOrder(B2BsalesDF)
-
-    B2CCsv.to_csv('B2CData.csv', sep=',')
-    B2BCsv.to_csv('B2BData.csv', sep=',')
-    B2CsalesDF.to_csv("B2CRawData.csv", sep=',')
-    B2BsalesDF.to_csv("B2BRawData.csv", sep=',')
+    # salesDF = readSales(skuRef,1)
+    # plotSales(salesDF, skuRef)
+    # sumSales(salesDF, "ftr")
+    # B2CsalesDF = readSales("FTR",3)
+    # B2BsalesDF = readSales("FTR",2)
+    # plotTotSales(B2CsalesDF,B2BsalesDF,salesDF)
+    # ozDF, twDF, activeDF, B2CsalesDF = splitSales(salesDF)
+    # plotSplitSales(ozDF, twDF, activeDF, B2CsalesDF)

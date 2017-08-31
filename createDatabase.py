@@ -11,28 +11,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 import datetime
 
-
-#Change these
-dbname = "BBBYO.db"
-
-metadata  = MetaData()
-Base    = declarative_base()
-Session   = sessionmaker()
-dbEngine  = None
-dbSession = None
-
-filePath = "CAM MIKE DATA\B2B"
-filePath2 = "CAM MIKE DATA\Stock Reports"
-filePath3 = "CAM MIKE DATA\B2C"
-filePath4 = "CAM MIKE DATA\Costings"
-
-purchDirectory = os.path.abspath(os.path.join(filePath))
-stockDirectory = os.path.abspath(os.path.join(filePath2))
-salesDirectory = os.path.abspath(os.path.join(filePath3))
-costDirectory = os.path.abspath(os.path.join(filePath4))
-
-
-
 class theActivePurchaseOrder(Base):
     __tablename__ = 'theActivePurchaseOrders'
 
@@ -640,3 +618,26 @@ def initialise():
 
 if __name__ == '__main__':
   initialise()
+
+  # Change these
+  dbname = "BBBYO.db"
+
+  metadata = MetaData()
+  Base = declarative_base()
+  Session = sessionmaker()
+  dbEngine = None
+  dbSession = None
+
+  filePath = "CAM MIKE DATA\B2B"
+  filePath2 = "CAM MIKE DATA\Stock Reports"
+  filePath3 = "CAM MIKE DATA\B2C"
+  filePath4 = "CAM MIKE DATA\Costings"
+  filePath5 = "CAM MIKE DATA\Costings\Warehouse"
+
+  purchDirectory = os.path.abspath(os.path.join(filePath))
+  stockDirectory = os.path.abspath(os.path.join(filePath2))
+  salesDirectory = os.path.abspath(os.path.join(filePath3))
+  costDirectory = os.path.abspath(os.path.join(filePath4))
+  warehouseDir = os.path.abspath(os.path.join(filePath5))
+
+  readWarehouse(warehouseDir)
