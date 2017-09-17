@@ -5,7 +5,7 @@ from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from createDatabase import OZPurchaseOrder, SalesData, TandWPurchaseOrder, hardToFind, \
-    ordersExport, theActivePurchaseOrder, createDB, stockReports, freightInvoices
+    ordersExport, theActivePurchaseOrder, createDB, stockReports, freightInvoices, warehouseInvoices
 import matplotlib.pyplot as plt
 import pandas as pd
 from numpy import array
@@ -249,6 +249,7 @@ def readSales(skuRef, orderType):
                            "skuNum": salesSku,
                             "purchRef": purchRef})
 
+    # print len(salesDF.Date)
     #remove non dated values
     salesDF = salesDF[salesDF['Date'] > datetime.datetime(2014,1,1,0,0,0).date()]
 
@@ -264,15 +265,20 @@ def plotSales(salesDF, skuRef):
     # plt.title("Sales level for Wood Grain Future bottles")
     plt.show()
 
+    plt.hist(salesDF['salesQ'], bins=25)
+    plt.title("Histogram of sales for " + skuRef)
+    plt.xlabel("Sales range")
+    plt.ylabel("Number of appearances")
+    plt.show()
 
 def sumSales(salesDF, skuRef):
 
     #add all numbers at the same date together
     sumSales = []
-    for i in salesDF['Date'].unique():
-        sumSales.append(float(salesDF.salesQ[salesDF['Date']==i].sum()))
+    for date in salesDF['Date'].unique():
+        sumSales.append(float(salesDF.salesQ[salesDF['Date']==date].sum()))
 
-    sumSalesDF = pd.DataFrame({"SumSales": sumSales,
+    sumSalesDF = pd.DataFrame({"salesQ": sumSales,
                                "Date": salesDF['Date'].unique()})
 
     sumSalesDF.sort_values(by="Date", inplace=True)
@@ -281,13 +287,13 @@ def sumSales(salesDF, skuRef):
     # plt.show()
 
 
-    plt.hist(sumSalesDF['SumSales'], bins=100)
+    plt.hist(sumSalesDF['salesQ'], bins=25)
     plt.title("Histogram of sales for " + skuRef)
     plt.xlabel("Sales range")
     plt.ylabel("Number of appearances")
     # plt.show()
 
-    meanSales = sumSalesDF['SumSales'].mean()
+    meanSales = sumSalesDF['salesQ'].mean()
     # print meanSales
     # Appears to be poisson distributed
     # pArray = np.random.poisson(meanSales, 1000)
@@ -299,8 +305,7 @@ def sumSales(salesDF, skuRef):
     saleOccurPercent = float(len(sumSalesDF['Date']))/(sumSalesDF['Date'].max()-sumSalesDF['Date'].min()).days
     # print saleOccurPercent
 
-    return salesDF
-
+    return sumSalesDF
 
 def readStock(skuRef):
     # stockdf = [instance for instance in dbSession.query(stockReports)]
@@ -347,15 +352,15 @@ def readStock(skuRef):
     for date in stockDF.Date.unique():
         sumStock.append(sum(stockDF.StockQty[stockDF.Date==date]))
 
-    plt.plot(stockDF.Date.unique(), sumStock)
-    plt.xlabel("Dates")
-    plt.ylabel("Stock level")
-    plt.title("Stock level for FTR items")
-    plt.show()
+    # plt.plot(stockDF.Date.unique(), sumStock)
+    # plt.xlabel("Dates")
+    # plt.ylabel("Stock level")
+    # plt.title("Stock level for FTR items")
+    # plt.show()
 
     return stockDF
 
-def timeSinceOrder(salesDF):
+def plotProcess(salesDF, skuRef):
     # need to create time since order array and amount ordered array for both B2C and B2B orders
 
     # add all numbers at the same date together
@@ -377,29 +382,34 @@ def timeSinceOrder(salesDF):
             timeOrderDiff.append((i-lastOrderDate).days)
             lastOrderDate = i
 
+    # Find order amounts
+    orderAmt = []
+    for date in salesDF.Date.unique():
+        orderAmt.append(len(salesDF.salesQ[salesDF['Date'] == date]))
 
     #Plot the freq of time diff
     plt.hist(timeOrderDiff, bins = 20)
     plt.xlabel("Difference in time")
     plt.ylabel("Frequency")
+    plt.xlim(0,18)
     plt.title("Histogram of time between orders")
-    # plt.show()
+    plt.show()
 
 
-    # Plot the freq of amount
+    # Plot the sales
     plt.hist(sumSalesDF['SumSales'], bins = 20)
     plt.xlabel("Sales amount")
     plt.ylabel("Frequency")
     plt.title("Histogram of sales amount")
-    # plt.show()
+    plt.show()
 
 
-    # Plot time diff vs amount
-    plt.scatter(timeOrderDiff, sumSalesDF['SumSales'])
-    plt.xlabel("Time difference")
-    plt.ylabel("Quantity ordered")
-    plt.title("Distribution of sale times")
-    # plt.show()
+    # Plot the order amount
+    plt.hist(orderAmt, bins=20)
+    plt.xlabel("Number of orders")
+    plt.ylabel("Frequency")
+    plt.title("Distribution of order amounts")
+    plt.show()
 
 
 
@@ -501,18 +511,89 @@ def plotSplitSales(ozDF, twDF, activeDF, B2CsalesDF):
     plt.legend(["Oz", "T&W", "Active", "B2C"])
     plt.show()
 
+def exploreWarehouse():
+    #Initialise
+    Qty = []
+    Desc = []
+    Unit = []
+    Total = []
+    Date = []
+    for row in dbSession.query(warehouseInvoices).order_by(warehouseInvoices.orderNum.asc()):
+        Qty.append(row.Quantity)
+        Desc.append(row.Description)
+        Unit.append(row.Unit)
+        Total.append(row.Total)
+        Date.append(row.Date)
+    warehouseDF = pd.DataFrame({
+                                "Quantity": Qty,
+                                "Description": Desc,
+                                "Unit": Unit,
+                                "Total": Total,
+                                "Date": Date
+    })
+
+    # Sum unique descriptions
+    sumTotals = []
+    for i in warehouseDF.Description.str.lower().unique():
+        # Sum all the totals
+        sumTotals.append(sum(warehouseDF.Total[warehouseDF.Description.str.lower() == i]))
+
+    descSumDF = pd.DataFrame({
+                            "SumTotals": sumTotals,
+                            "Description": warehouseDF.Description.str.lower().unique()
+    })
+
+    descSumDF.sort_values('SumTotals', inplace=True)
+
+   # Sum dates
+    sumTotals = []
+    inclDates = []
+    inclQty = []
+    for i in warehouseDF.Date[warehouseDF.Description=="pick/pack rate (per item)"].unique():
+        sumTotals.append(sum(warehouseDF.Total[warehouseDF.Date==i]))
+        inclDates.append(i)
+        inclQty.append(sum(warehouseDF.Quantity[(warehouseDF.Date==i) & (warehouseDF.Description=="pick/pack rate (per item)")]))
+
+    dateSumDF = pd.DataFrame({
+                            "Date": inclDates,
+                            "SumTotalCost": sumTotals,
+                            "Qty": inclQty
+    })
+    dateSumDF.sort_values('Qty', inplace=True)
+
+    # print sum(dateSumDF.SumTotalCost)/sum(dateSumDF.Qty) # Average cost per item
+    # print dateSumDF
+    fixedX = warehouseDF.Date[warehouseDF.Description=="order processing (per order)"]
+    fixedY = warehouseDF.Total[warehouseDF.Description=="order processing (per order)"]
+    fixed = pd.DataFrame({
+        "X": fixedX,
+        "Y": fixedY
+    })
+    fixed.sort_values('X', inplace=True)
+    # plt.plot(fixed.X, fixed.Y)
+    # plt.xlabel("Dates")
+    # plt.ylabel("Total cost of order processing")
+    # plt.title("Cost of order processing over time")
+    # plt.show()
+    print sum(fixedY)/len(fixedY)# Average fixed cost
+
 
 if __name__ == '__main__':
     loadSession()
     connection = dbEngine.connect()
-    # skuRef = "all"
-    readStock(skuRef='ftr')
+    skuRef = "ftr"
+    exploreWarehouse()
+    # readStock(skuRef='ftr')
     # readCosts()
     # salesDF = readSales(skuRef,1)
-    # plotSales(salesDF, skuRef)
-    # sumSales(salesDF, "ftr")
+    # plotSales(sumSalesDF, skuRef)
+    # print sumSalesDF
     # B2CsalesDF = readSales("FTR",3)
     # B2BsalesDF = readSales("FTR",2)
+    # B2CsumSalesDF = sumSales(B2CsalesDF, "ftr")
+    # B2BsumSalesDF = sumSales(B2BsalesDF, "ftr")
+    # plotProcess(B2CsalesDF, skuRef)
+    # plotProcess(B2BsalesDF, skuRef)
     # plotTotSales(B2CsalesDF,B2BsalesDF,salesDF)
     # ozDF, twDF, activeDF, B2CsalesDF = splitSales(salesDF)
     # plotSplitSales(ozDF, twDF, activeDF, B2CsalesDF)

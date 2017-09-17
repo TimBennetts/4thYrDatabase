@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 import datetime
 import scipy.stats as st
 import random
+import csv
 
 def loadSession():
     global dbEngine
@@ -165,7 +166,6 @@ def Costs():
     return leadTime
 
 
-
 def calcDemand(skuRef, timeRange, method):
     salesDF = getSalesDF(skuRef,dbSession)
     leadTime = 15 # L in days
@@ -312,7 +312,6 @@ def calcDemand(skuRef, timeRange, method):
 #     return demand, meanDemand
 
 
-
 def findCurrentQ(skuRef):
     stockQ = []
     stockDate = []
@@ -341,6 +340,7 @@ def EOQModel(skuRef, distMethod, dbSession):
     if initialQ == None:
         return
     # fixedCost = 133 #K, cost per order, Don't know where this comes from?!
+    fixedCost = 213.17 #K, comes from average order processing from warehouse
     holdCost = 0.001#h, per bottle per day
     leadTime = 15 #L in days
     timeRange = 2*365 # in days, arbitary
@@ -380,12 +380,12 @@ def EOQModel(skuRef, distMethod, dbSession):
     print plotString
 
     plt.plot(range(timeRange),quantity)
-    plt.title("EOQ model of " + skuRef + " using " + methodDisc)
+    plt.title("EOQ model of " + skuRef)
     plt.xlabel("Time in days")
     plt.ylabel("Stock level")
     plt.xticks(range(0,timeRange,90))
-    plt.text(timeRange/8, initialQ, plotString)
-    plt.show()
+    # plt.text(timeRange/8, initialQ, plotString)
+
 
     return quantity, timeRange
 
@@ -487,11 +487,11 @@ def getMeanData(salesDF):
 
     return orderMean, timeMean, salesMean
 
-
 def createDemand2(inclOrder, inclTime, inclSales, timeRange, B2CsalesDF, B2BsalesDF, seedNum):
     # Initialise
     np.random.seed(seedNum)
     quantitySold = [0]*timeRange
+    # Used for non-distribution demand
     B2CorderMean, B2CtimeMean, B2CsalesMean = getMeanData(B2CsalesDF)
     B2BorderMean, B2BtimeMean, B2BsalesMean = getMeanData(B2BsalesDF)
 
@@ -500,7 +500,6 @@ def createDemand2(inclOrder, inclTime, inclSales, timeRange, B2CsalesDF, B2Bsale
     B2BsaleDays = []
     B2CsumDays = 0
     B2BsumDays = 0
-    B2BsumSales = 0
 
     # Find B2C sale days
     while B2CsumDays < timeRange:
@@ -530,58 +529,67 @@ def createDemand2(inclOrder, inclTime, inclSales, timeRange, B2CsalesDF, B2Bsale
 
     # Find orders and amount of sales on a sale day
     # B2C orders
-    for i in B2CsaleDays:
-        if inclOrder:
-            numOrders = round(np.random.lognormal(0.9519, 0.7615), 0)
-        else:
-            numOrders = round(B2CorderMean, 0)
-        # Find number of sales in each order
-        # for B2C all sales are 1 unit
-        B2CsumSales = numOrders
-        quantitySold[i-1] += B2CsumSales
-
-      # B2B orders
-    for i in B2BsaleDays:
-        B2BsumSales = 0
-        if inclOrder:
-            numOrders = int(round(41.685 * np.random.weibull(4.535), 0))
-        else:
-            numOrders = int(round(B2BorderMean,0))
-
-        for j in range(numOrders):
-            if inclSales:
-                B2BsumSales += int(round(np.random.lognormal(2.0454, 1.0287),0))
+    B2CsumSales = [0]*len(B2CsaleDays)
+    B2BsumSales = [0] * len(B2BsaleDays)
+    totalSales = []
+    for i in range(timeRange):
+        salesList = []
+        numOrders = 0
+        if i in B2CsaleDays:
+            if inclOrder:
+                numOrders = int(round(np.random.lognormal(0.9519, 0.7615), 0))
             else:
-                B2BsumSales += round(B2BsalesMean)
-        quantitySold[i-1] = B2BsumSales
+                numOrders = int(round(B2CorderMean, 0))
+            # Find number of sales in each order
+            # for B2C all sales are 1 unit
+            for j in range(numOrders):
+                salesList.append(1)
 
-    return quantitySold
+        # B2B orders
+        numOrders = 0
+        if i in B2BsaleDays:
+            if inclOrder:
+                numOrders = int(round(41.685 * np.random.weibull(4.535), 0))
+            else:
+                numOrders = int(round(B2BorderMean,0))
 
+            for j in range(numOrders):
+                if inclSales:
+                    salesList.append(int(round(np.random.lognormal(2.0454, 1.0287),0)))
+                else:
+                    salesList.append(round(B2BsalesMean))
 
-def eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2BsalesDF, seedNum, timeRange, serviceLvl):
+        quantitySold[i-1] = salesList
+        totalSales.append(sum(salesList))
+    return quantitySold, totalSales
+
+def eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2BsalesDF, seedNum, timeRange, serviceLvl, reorderPoint, Qstar, inclInputs):
     # initial variables - time in days
     prodCost = 5.36 + 1 + 0.2  # P production + transport cost + incoming warehouse rate, from email from Don
     initialQ = findCurrentQ(skuRef)
     if initialQ == None:
-        print initialQ
+        print str(initialQ) + " None?"
         return
-    fixedCost = 133  # K, cost per order, Don't know where this comes from?!
+    # fixedCost = 133  # K, cost per order, Don't know where this comes from?!
+    fixedCost = 213.17  # K, comes from average order processing from warehouse - Need fixed rate on freighting...
     holdCost = 0.001  # h, per bottle per day
     leadTime = 15  # L in days
 
     # Find demand
-    demand = createDemand2(inclOrder, inclTime, inclSales, timeRange, B2CsalesDF, B2BsalesDF, seedNum)
-    meanDemand = sum(demand)/timeRange
+    demand, totalSales = createDemand2(inclOrder, inclTime, inclSales, timeRange, B2CsalesDF, B2BsalesDF, seedNum)
+    meanDemand = sum(totalSales)/timeRange
 
     # Find re-order quantity
-    Qstar = math.ceil(math.sqrt(2 * meanDemand * fixedCost / holdCost))  # optimal order quantity Q*
+    if not inclInputs:
+        Qstar = math.ceil(math.sqrt(2 * meanDemand * fixedCost / holdCost)) # optimal order quantity Q*
 
     # Find reorder quantity
-    if inclSafety:
-        zScore = st.norm.ppf(serviceLvl)
-        reorderPoint = math.ceil(meanDemand*leadTime) + round(zScore * np.std(demand) * np.sqrt(leadTime),0)
-    else:
-        reorderPoint = math.ceil(meanDemand*leadTime)
+    if not inclInputs: #only do this if reorder Q has not already been set
+        if inclSafety:
+            zScore = st.norm.ppf(serviceLvl)
+            reorderPoint = math.ceil(meanDemand*leadTime) + round(zScore * np.std(totalSales) * np.sqrt(leadTime),0)
+        else:
+            reorderPoint = math.ceil(meanDemand*leadTime)
 
     # allocate/initialise
     quantity = [0] * timeRange
@@ -590,9 +598,12 @@ def eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2
     arrivalTime = 0
     missedSales = 0
     missedTime = 0
+    biggestMissedSale = 0
+    smallestMissedSale = 99999
 
     for t in range(1, timeRange):
-        quantity[t] += quantity[t - 1] - demand[t]  # quantity[t] should be 0 unless a reorder has been made
+        # print t, type(quantity[t]), type(quantity[t-1]), type(sum(demand[t]))
+        quantity[t] += quantity[t - 1] - sum(demand[t]) # quantity[t] should be 0 unless a reorder has been made
         if (quantity[t] < reorderPoint) & (reordered == False):
             if t + leadTime < timeRange:
                 arrivalTime = t + leadTime
@@ -601,12 +612,24 @@ def eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2
         elif arrivalTime == t:
             reordered = False
         if quantity[t] < 0:
-            missedSales += -quantity[t]
+            quantity[t] + sum(demand[t]) # Re-add the unfulfillable demand
+            stockLeft = quantity[t]
+            for sales in sorted(demand[t], reverse=True):
+                if sales < stockLeft:
+                    quantity[t] - sales
+                    stockLeft - sales
+                else:
+                    missedSales += sales
+                    # Record biggest and smallest missed sales
+                    if sales > biggestMissedSale:
+                        biggestMissedSale = sales
+                    if sales < smallestMissedSale:
+                        smallestMissedSale = sales
             missedTime += 1
-            quantity[t] = 0
+
 
     # Find costs
-    totProdCost = sum(demand)*prodCost
+    totProdCost = sum(totalSales)*prodCost
     totHoldCost = sum(quantity)*holdCost
     totCost = totProdCost + totHoldCost
     dailyCost = totCost/timeRange
@@ -614,7 +637,7 @@ def eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2
 
     plotString = ("Missed sales: " + str(missedSales) + ", reorder quantity: " + str(reorderPoint)
                   + ", days without stock:" + str(missedTime) + ", annual cost: " + str(yearCost))
-    print plotString
+    # print plotString
 
     # plt.plot(range(timeRange), quantity)
     # plt.title("EOQ model of " + skuRef)
@@ -625,7 +648,7 @@ def eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2
     # plt.text(10, initialQ, plotString)
     # plt.show()
 
-    return quantity, missedSales, missedTime, reorderPoint, Qstar, yearCost
+    return quantity, missedSales, missedTime, reorderPoint, Qstar, yearCost, biggestMissedSale, smallestMissedSale
 
 def plotSims(numSims, msdSalesCumul, msdTimeCumul, reorderSchd, QstarSchd):
 
@@ -665,7 +688,6 @@ def plotSims(numSims, msdSalesCumul, msdTimeCumul, reorderSchd, QstarSchd):
     plt.text(1, 0.75 * max(QstarSchd), plotString1)
     plt.show()
 
-
 def sumStock(stockDF):
     # add all numbers at the same date together
     sumStock = []
@@ -679,6 +701,35 @@ def sumStock(stockDF):
 
     return sumStockDF
 
+def stockVSsales():
+
+
+# plot sims against stock lvls
+    stockDF = ExploreData.readStock(skuRef)
+# # sum unique dates
+# # print stockDF
+# sumStockDF = sumStock(stockDF)
+# daysFromStart = []
+# for i in sumStockDF.Date:
+#     daysFromStart.append((i-min(sumStockDF.Date)).days)
+#
+# sumStockDF['dayCount'] = daysFromStart
+# # Linear interpolating stock
+# stockQrange = []
+# for i in range(len(sumStockDF.dayCount[:-1])):
+#     stockQrange.append(sumStockDF.iloc[i, sumStockDF.columns.get_loc('SumStock')])
+#     diffDays = sumStockDF.iloc[i+1, sumStockDF.columns.get_loc('dayCount')] - sumStockDF.iloc[i, sumStockDF.columns.get_loc('dayCount')] - 1
+#     diffSales = round((sumStockDF.iloc[i+1, sumStockDF.columns.get_loc('SumStock')] - sumStockDF.iloc[i, sumStockDF.columns.get_loc('SumStock')])/(diffDays-1), 0)
+#
+#     for j in range(diffDays):
+#         stockQrange.append(diffSales*(j+1)+ sumStockDF.iloc[i, sumStockDF.columns.get_loc('SumStock')])
+#
+#
+# # stockQrange.append(sumStockDF.SumStock[sumStockDF.Date==max(sumStockDF.Date)])
+#
+# plt.plot(range(timeRange), stockQrange)
+# plt.show()
+
 if __name__ == '__main__':
     startRunTime = time.time()
     loadSession()
@@ -690,69 +741,76 @@ if __name__ == '__main__':
     # quantity, timeRange = EOQModel(skuRef, distMethod, dbSession)
     # simulateDemand(skuRef)
     ExploreData.loadSession()
-    # salesDF = ExploreData.readSales("ftr",1)
+    salesDF = ExploreData.readSales("ftr",1)
     B2CsalesDF = ExploreData.readSales("FTR",3)
     B2BsalesDF = ExploreData.readSales("FTR",2)
     # ozDF, twDF, activeDF, B2CsalesDF =  ExploreData.splitSales(salesDF)
 
     timeRange = 365*2  # in days, amount of days of stock reports
-    serviceLvl = 0.995  # service level (alpha):
+    serviceLvl = 0.95  # service level (alpha):
     numSims = 100
+
+    # distMethod = 2
+    # for distMethod in range(2,4):
+    #     print distMethod
+    #     EOQModel(skuRef, distMethod, dbSession)
 
     inclOrder = True
     inclTime = True
     inclSales = True
     inclSafety = True
+    inclInputs = True
 
-    # Create arrays
-    quantity = [[0 for x in range(timeRange+1)] for y in range(0,numSims)]
-    msdSalesCumul = []
-    msdTimeCumul = []
-    reorderSchd = []
-    QstarSchd = []
-    yearCostCumul = []
+    simList = []
+    for reorderPoint in range(400,2000,50):
+        for Qstar in range(1500,4000,50):
+            print reorderPoint, Qstar
+            # Create arrays
+            quantity = [[0 for x in range(timeRange + 1)] for y in range(0, numSims)]
+            msdSalesCumul = []
+            msdTimeCumul = []
+            reorderSchd = []
+            QstarSchd = []
+            yearCostCumul = []
+            lrgstMsdSaleCumul = []
+            smlstMsdSaleCumul = []
+            for i in range(0,numSims):
+                seedNum = i
+                quantity[i], missedSales, missedTime, reorderPoint, Qstar, yearCost, lrgstMsdSale, smlstMsdSale = \
+                    eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2BsalesDF, seedNum, timeRange, serviceLvl,reorderPoint, Qstar, inclInputs) #missedSales, missedTime, reorderPoint, Qstar
 
-    for i in range(0,numSims):
-        seedNum = i
-        quantity[i], missedSales, missedTime, reorderPoint, Qstar, yearCost = \
-            eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2BsalesDF, seedNum, timeRange, serviceLvl) #missedSales, missedTime, reorderPoint, Qstar
+                msdSalesCumul.append(missedSales)
+                msdTimeCumul.append(missedTime)
+                reorderSchd.append(reorderPoint)
+                QstarSchd.append(Qstar)
+                yearCostCumul.append(yearCost)
+                lrgstMsdSaleCumul.append(lrgstMsdSale)
+                smlstMsdSaleCumul.append(smlstMsdSale)
 
-        msdSalesCumul.append(missedSales)
-        msdTimeCumul.append(missedTime)
-        reorderSchd.append(reorderPoint)
-        QstarSchd.append(Qstar)
-        yearCostCumul.append(yearCost)
+            simDF = pd.DataFrame({
+                                "simulationNumber": range(1,numSims+1),
+                                "reorderPoint": [reorderPoint]*len(range(1,numSims+1)),
+                                "Qstar": [Qstar]*len(range(1,numSims+1)),
+                                "missedDays": msdTimeCumul,
+                                "missedSales": msdSalesCumul,
+                                "largestMissedSale": lrgstMsdSaleCumul,
+                                "smallestMissedSale": smlstMsdSaleCumul,
+                                "quantity": quantity,
+                                "Cost": yearCostCumul
+            })
+            simList.append(simDF)
 
-    # plot sims against stock lvls
-    # stockDF = ExploreData.readStock(skuRef)
-    # # sum unique dates
-    # # print stockDF
-    # sumStockDF = sumStock(stockDF)
-    # daysFromStart = []
-    # for i in sumStockDF.Date:
-    #     daysFromStart.append((i-min(sumStockDF.Date)).days)
-    #
-    # sumStockDF['dayCount'] = daysFromStart
-    # # Linear interpolating stock
-    # stockQrange = []
-    # for i in range(len(sumStockDF.dayCount[:-1])):
-    #     stockQrange.append(sumStockDF.iloc[i, sumStockDF.columns.get_loc('SumStock')])
-    #     diffDays = sumStockDF.iloc[i+1, sumStockDF.columns.get_loc('dayCount')] - sumStockDF.iloc[i, sumStockDF.columns.get_loc('dayCount')] - 1
-    #     diffSales = round((sumStockDF.iloc[i+1, sumStockDF.columns.get_loc('SumStock')] - sumStockDF.iloc[i, sumStockDF.columns.get_loc('SumStock')])/(diffDays-1), 0)
-    #
-    #     for j in range(diffDays):
-    #         stockQrange.append(diffSales*(j+1)+ sumStockDF.iloc[i, sumStockDF.columns.get_loc('SumStock')])
-    #
-    #
-    # # stockQrange.append(sumStockDF.SumStock[sumStockDF.Date==max(sumStockDF.Date)])
-    #
-    # plt.plot(range(timeRange), stockQrange)
-    # plt.show()
+    storeDF = pd.concat(simList, axis=0, ignore_index=True)
+
+    # Write output to csv
+    fileDir = "SimulationResults.csv" #file name
+    storeDF.to_csv(fileDir, index=False)
 
 
+    print("--- %s seconds ---" % (time.time() - startRunTime))
 
     # Plot simulation results
-    plotSims(numSims, msdSalesCumul, msdTimeCumul, reorderSchd, QstarSchd)
+    # plotSims(numSims, msdSalesCumul, msdTimeCumul, reorderSchd, QstarSchd)
 
     # #turn individual tables to csvs
     # ozDF.to_csv("ozDF.csv", sep=',', header=True)
@@ -781,4 +839,3 @@ if __name__ == '__main__':
     # plt.show()
 
 
-    print("--- %s seconds ---" % (time.time() - startRunTime))

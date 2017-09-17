@@ -3,8 +3,8 @@ import xlrd
 import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
 import datetime
-from dateutil import parser
 import csv
+import pandas as pd
 
 Base = declarative_base()
 
@@ -152,37 +152,100 @@ def dateTimeConv(xlDate):
     return dt
 
 def readWarehouse(inputDir):
+    # Check input directory
+    if inputDir == "":
+        print "No input directory"
+        return
+    else:
+        print inputDir
 
     #initialise
-    fileList = []
-
+    fileList = [] # Should be
+    numFiles = 0
+    os.chdir(inputDir)
     # Import warehouse csvs
     for root, dirs, files in os.walk(inputDir):
         for file in files:
-            print files
-            print file
+            invDoc = []
+            # print files
             if file.endswith(".csv"):
                 with open(file) as f:
                     readCSV = csv.reader(f, delimiter=',')
-                    fileList.append(readCSV)
-    print fileList
-    for row in fileList[0]:
-        print row
+                    numFiles += 1
+                    for row in readCSV:
+                        invDoc.append(row)
+            fileList.append(invDoc)
+    # print fileList
 
+    # get relevant data
+    Qty = []
+    Desc = []
+    Unit = []
+    Total = []
+    fileDate = []
+    Record = False
+    for i in range(len(fileList)): # invoice
+        for j in range(len(fileList[i])): # row
+            # Find date
+            if fileList[i][j][0].lower() == "work completed week ending":
+                invoiceDate = fileList[i][j+1][0]
+            # End recording
+            if fileList[i][j][1] == "":
+                Record = False
+            # Record things
+            if Record:
+                # Find if Qty is empty or not
+                if fileList[i][j][0] == "":
+                    Qty.append(1)
+                else:
+                    Qty.append(int(fileList[i][j][0].replace('$',"").replace(',',"")))
+                Desc.append((fileList[i][j][1]).lower())
+                if fileList[i][j][4] == "":
+                    Unit.append(float(fileList[i][j][7].replace('$',"").replace(',',"")))
+                else:
+                    Unit.append(float(fileList[i][j][4].replace('$',"").replace(',',"")))
+                try:
+                    Total.append(float(fileList[i][j][7].replace('$',"").replace(',',"")))
+                except ValueError:
+                    # print "The float conversion failed on: " + fileList[i][j][7] - All errors are caused by ""
+                    Total.append(0)
+                fileDate.append(datetime.datetime.strptime(invoiceDate, '%d-%m-%Y'))
+                # print invoiceDate
+            # Find starting point
+            if fileList[i][j][0] == "QTY":
+                Record = True
 
-        # Input into DF
+    warehouseDF = pd.DataFrame({
+        "Quantity": Qty,
+        "Description": Desc,
+        "Unit": Unit,
+        "Total": Total,
+        "Date": fileDate
+    })
 
-    # Do stuff
+    # Sum unique descriptions
+    sumTotals = []
+    for i in warehouseDF.Description.str.lower().unique():
+        sumTotals.append(sum(warehouseDF.Total[warehouseDF.Description.str.lower() == i]))
 
-    # Calculate costs
+    sumDF = pd.DataFrame({
+        "SumTotals": sumTotals,
+        "Description": warehouseDF.Description.str.lower().unique()
+    })
 
-    # Win
+    sumDF.sort_values('SumTotals', inplace=True)
+
+    warehouseDF = warehouseDF[warehouseDF.Description.isin((sumDF.Description[sumDF.SumTotals > 0.01 * sum(sumDF.SumTotals)]).as_matrix()) == True]
+    warehouseDF = warehouseDF.reset_index(drop=True)
+
+    return warehouseDF
+
 
 if __name__ == '__main__':
     filePath = "CAM MIKE DATA\Costings\Warehouse"
-    inputDir = os.path.abspath(os.path.join(filePath))
+    warehouseDir = os.path.abspath(os.path.join(filePath))
+    warehouseDF = readWarehouse(warehouseDir)
 
-    readWarehouse(inputDir)
 
 
 

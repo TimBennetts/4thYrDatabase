@@ -10,6 +10,7 @@ from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 import datetime
+import numpy as np
 
 class theActivePurchaseOrder(Base):
     __tablename__ = 'theActivePurchaseOrders'
@@ -197,27 +198,12 @@ class stockReports(Base):
 
 class warehouseInvoices(Base):
     __tablename__ = 'warehouseInvoiceInfo'
-    orderNum = Column(String, primary_key=True)
-    orderDate = Column(Date)
-    palletCount = Column(Integer)
-    shelvesQty = Column(Integer)
-    cartonsQty = Column(Integer)
-    packRateQty = Column(Integer)
-    inwardsRateQty = Column(Integer)
-    removeCoversQty = Column(Integer)
-    orderProcessingQty = Column(Integer)
-    stockReportQty = Column(Integer)
-    palletSpaceCost = Column(String)
-    shelvesCost = Column(Float)
-    cartonsInCost = Column(String)
-    packRateCost = Column(String)
-    inwardsRateCost = Column(String)
-    removeCoversCost = Column(String)
-    orderProcessingCost = Column(String)
-    stockReportCost = Column(String)
-    materialsCost = Column(Float)
-    transportCost = Column(Float)
-    totalCost = Column(Float)
+    orderNum = Column(Integer, primary_key=True)
+    Quantity = Column(Integer)
+    Description = Column(String)
+    Unit = Column(Float)
+    Total = Column(Float)
+    Date = Column(Date)
 
 class freightInvoices(Base):
     __tablename__ = 'freightInvoiceInfo'
@@ -240,12 +226,13 @@ def createDB(dbname):
     
     #create tables
     Base.metadata.create_all(dbEngine)
+    Session = sessionmaker()
     Session.configure(bind=dbEngine)
     
     #create Session
     dbSession = Session()
 
-    print "db created"
+    print "DB created"
     
     return dbSession
 
@@ -477,60 +464,18 @@ def readSales(salesDirectory):
             counter2 = counter2 + 1
     dbSession.commit()
 
-def readCostings(costDirectory):
-    print costDirectory
-    wsList = readFiles(costDirectory)
-    wsRange = []
-    headers = []
-    for ws in wsList:
-        list1, list2 = readSaleWs(ws)
-        wsRange.append(list1)
-        headers.append(list2)
+def readWarehousing(warehouseDF):
 
-    for i in range(len(wsRange)):
-         counter3 = 0
-         for j in range(len(wsRange[i])):
-            if i == 0: #Freight
-                FreightInvoiceInfo = freightInvoices(
-                    orderNum = counter3,
-                    orderDate = dateTimeConv(wsRange[i][j][0].value),
-                    weight = wsRange[i][j][1].value,
-                    volume = wsRange[i][j][2].value,
-                    chargeable = wsRange[i][j][3].value,
-                    numShipped = wsRange[i][j][4].value,
-                    ETD = dateTimeConv(wsRange[i][j][5].value),  # Estimated time departed
-                    ETA = dateTimeConv(wsRange[i][j][6].value), # Estimated time of arrival
-                    totalCost = wsRange[i][j][7].value,
-                )
-                dbSession.add(FreightInvoiceInfo)
-
-            elif i == 1: #warehousing
-                WarehouseInvoiceInfo = warehouseInvoices(
-                    orderNum = counter3,
-                    orderDate = dateTimeConv(wsRange[i][j][0].value),
-                    palletCount = wsRange[i][j][1].value,
-                    shelvesQty = wsRange[i][j][2].value,
-                    cartonsQty = wsRange[i][j][3].value,
-                    packRateQty = wsRange[i][j][4].value,
-                    inwardsRateQty = wsRange[i][j][5].value,
-                    removeCoversQty = wsRange[i][j][6].value,
-                    orderProcessingQty = wsRange[i][j][7].value,
-                    stockReportQty = wsRange[i][j][8].value,
-                    palletSpaceCost = wsRange[i][j][9].value,
-                    shelvesCost = wsRange[i][j][10].value,
-                    cartonsInCost = wsRange[i][j][11].value,
-                    packRateCost = wsRange[i][j][12].value,
-                    inwardsRateCost = wsRange[i][j][13].value,
-                    removeCoversCost = wsRange[i][j][14].value,
-                    orderProcessingCost = wsRange[i][j][15].value,
-                    stockReportCost = wsRange[i][j][16].value,
-                    materialsCost = wsRange[i][j][17].value,
-                    transportCost = wsRange[i][j][18].value,
-                    totalCost = wsRange[i][j][19].value
-                )
-                dbSession.add(WarehouseInvoiceInfo)
-
-            counter3 += 1
+    for row in range(len(warehouseDF)):
+        warehouseInvoiceInfo = warehouseInvoices(
+                                                orderNum = row,
+                                                Quantity = int(warehouseDF.Quantity[row].item()),
+                                                Description = warehouseDF.Description[row],
+                                                Unit = float(warehouseDF.Unit[row].item()),
+                                                Total = float(warehouseDF.Total[row].item()),
+                                                Date = warehouseDF.Date[row].to_pydatetime().date()
+        )
+        dbSession.add(warehouseInvoiceInfo)
     dbSession.commit()
 
 def loadSession():
@@ -551,7 +496,7 @@ def skuCompletion():
     # salesDF = readSales(skuRef = "all", orderType = 1)
 
     #load session
-    loadSession()
+    # loadSession()
 
     # # Get db table names
     # dbTables = []
@@ -597,36 +542,36 @@ def skuCompletion():
 
 
 def initialise():
-    # createDB(dbname)
-    # # Adding the purchase order files into the database
-    # for subDirs, dirs, files in os.walk(purchDirectory):
-    #     if subDirs != purchDirectory:
-    #         # print subDirs
-    #         readPurchaseOrder(subDirs)
-    #
-    # # Adding the stock reports to the database
-    # readStockReports(stockDirectory)
-    #
-    # # Adding the sales files to the database
-    # readSales(salesDirectory)
-    #
-    # # Adding the cost files to the database
-    # readCostings(costDirectory)
+    createDB(dbname)
+
+    print os.getcwd()
+
+    # Adding the purchase order files into the database
+    for subDirs, dirs, files in os.walk(purchDirectory):
+        if subDirs != purchDirectory:
+            # print subDirs
+            readPurchaseOrder(subDirs)
+
+    # Adding the stock reports to the database
+    readStockReports(stockDirectory)
+
+    # Adding the sales files to the database
+    readSales(salesDirectory)
+    # Adding the cost files to the database
+    warehouseDF = readWarehouse(warehouseDir)
+    readWarehousing(warehouseDF)
 
     # Add skus for incomplete lists
-    skuCompletion()
+    # skuCompletion()
 
 if __name__ == '__main__':
-  initialise()
-
   # Change these
   dbname = "BBBYO.db"
 
-  metadata = MetaData()
-  Base = declarative_base()
-  Session = sessionmaker()
-  dbEngine = None
-  dbSession = None
+  # metadata = MetaData()
+  # Session = sessionmaker()
+  # dbEngine = None
+  # dbSession = None
 
   filePath = "CAM MIKE DATA\B2B"
   filePath2 = "CAM MIKE DATA\Stock Reports"
@@ -640,4 +585,7 @@ if __name__ == '__main__':
   costDirectory = os.path.abspath(os.path.join(filePath4))
   warehouseDir = os.path.abspath(os.path.join(filePath5))
 
-  readWarehouse(warehouseDir)
+  # warehouseDF = readWarehouse(warehouseDir)
+  # readWarehousing(warehouseDF)
+  #
+  initialise()
