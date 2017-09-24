@@ -12,7 +12,6 @@ from sqlalchemy import *
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
 import datetime
-import scipy.stats as st
 import random
 import csv
 
@@ -125,7 +124,6 @@ def getSalesDF(skuRef,dbSession):
 
     return salesDF
 
-
 def Costs():
     # pre-allocate arrays
     date = []
@@ -165,12 +163,11 @@ def Costs():
 
     return leadTime
 
-
 def calcDemand(skuRef, timeRange, method):
     salesDF = getSalesDF(skuRef,dbSession)
     leadTime = 15 # L in days
     serviceLvl = 0.95 # service level (alpha):
-    zScore = st.norm.ppf(serviceLvl)
+    zScore = np.norm.ppf(serviceLvl)
 
     #check sku
     if salesDF.empty:
@@ -487,83 +484,87 @@ def getMeanData(salesDF):
 
     return orderMean, timeMean, salesMean
 
-def createDemand2(inclOrder, inclTime, inclSales, timeRange, B2CsalesDF, B2BsalesDF, seedNum):
+def createDemand2(inclOrder, inclTime, inclSales, timeRange, B2CsalesDF, B2BsalesDF, numSims):
     # Initialise
-    np.random.seed(seedNum)
-    quantitySold = [0]*timeRange
-    # Used for non-distribution demand
-    B2CorderMean, B2CtimeMean, B2CsalesMean = getMeanData(B2CsalesDF)
-    B2BorderMean, B2BtimeMean, B2BsalesMean = getMeanData(B2BsalesDF)
+    quantitySold = [[0 for x in range(timeRange + 1)] for y in range(0, numSims)] # + 1 because?
+    totalSales = [[0 for x in range(timeRange + 1)] for y in range(0, numSims)]
 
-    # Find days
-    B2CsaleDays = []
-    B2BsaleDays = []
-    B2CsumDays = 0
-    B2BsumDays = 0
+    for numSim in range(numSims):
+        # Initialise
+        np.random.seed(numSim)
+        # quantitySold = [0]*timeRange
+        # Used for non-distribution demand
+        B2CorderMean, B2CtimeMean, B2CsalesMean = getMeanData(B2CsalesDF)
+        B2BorderMean, B2BtimeMean, B2BsalesMean = getMeanData(B2BsalesDF)
 
-    # Find B2C sale days
-    while B2CsumDays < timeRange:
-        if inclTime:
-            nextSale = int(round(np.random.lognormal(0.1994, 0.4327), 0))
-        else:
-            nextSale = int(round(B2CorderMean,0))
-        B2CsumDays += nextSale
-        B2CsaleDays.append(B2CsumDays)
+        # Find days
+        B2CsaleDays = []
+        B2BsaleDays = []
+        B2CsumDays = 0
+        B2BsumDays = 0
 
-    # Find B2B sale days
-    while B2BsumDays < timeRange:
-        if inclTime:
-            nextSale = int(round(35.9183 * np.random.weibull(1.2590), 0))
-        else:
-            nextSale = int(round(B2BtimeMean,0))
-
-        B2BsumDays += nextSale
-        B2BsaleDays.append(B2BsumDays)
-
-    # Make sure that the last date is within time range
-    if B2BsaleDays[len(B2BsaleDays)-1] > timeRange:
-        B2BsaleDays = B2BsaleDays[:-1]
-
-    if B2CsaleDays[len(B2CsaleDays) - 1] > timeRange:
-        B2CsaleDays = B2CsaleDays[:-1]
-
-    # Find orders and amount of sales on a sale day
-    # B2C orders
-    B2CsumSales = [0]*len(B2CsaleDays)
-    B2BsumSales = [0] * len(B2BsaleDays)
-    totalSales = []
-    for i in range(timeRange):
-        salesList = []
-        numOrders = 0
-        if i in B2CsaleDays:
-            if inclOrder:
-                numOrders = int(round(np.random.lognormal(0.9519, 0.7615), 0))
+        # Find B2C sale days
+        while B2CsumDays < timeRange:
+            if inclTime:
+                nextSale = int(round(np.random.lognormal(0.1994, 0.4327), 0))
             else:
-                numOrders = int(round(B2CorderMean, 0))
-            # Find number of sales in each order
-            # for B2C all sales are 1 unit
-            for j in range(numOrders):
-                salesList.append(1)
+                nextSale = int(round(B2CorderMean,0))
+            B2CsumDays += nextSale
+            B2CsaleDays.append(B2CsumDays)
 
-        # B2B orders
-        numOrders = 0
-        if i in B2BsaleDays:
-            if inclOrder:
-                numOrders = int(round(41.685 * np.random.weibull(4.535), 0))
+        # Find B2B sale days
+        while B2BsumDays < timeRange:
+            if inclTime:
+                nextSale = int(round(35.9183 * np.random.weibull(1.2590), 0))
             else:
-                numOrders = int(round(B2BorderMean,0))
+                nextSale = int(round(B2BtimeMean,0))
 
-            for j in range(numOrders):
-                if inclSales:
-                    salesList.append(int(round(np.random.lognormal(2.0454, 1.0287),0)))
+            B2BsumDays += nextSale
+            B2BsaleDays.append(B2BsumDays)
+
+        # Make sure that the last date is within time range
+        if B2BsaleDays[len(B2BsaleDays)-1] > timeRange:
+            B2BsaleDays = B2BsaleDays[:-1]
+
+        if B2CsaleDays[len(B2CsaleDays) - 1] > timeRange:
+            B2CsaleDays = B2CsaleDays[:-1]
+
+        # Find orders and amount of sales on a sale day
+        # B2C orders
+        B2CsumSales = [0]*len(B2CsaleDays)
+        B2BsumSales = [0] * len(B2BsaleDays)
+        for i in range(timeRange):
+            salesList = []
+            numOrders = 0
+            if i in B2CsaleDays:
+                if inclOrder:
+                    numOrders = int(round(np.random.lognormal(0.9519, 0.7615), 0))
                 else:
-                    salesList.append(round(B2BsalesMean))
+                    numOrders = int(round(B2CorderMean, 0))
+                # Find number of sales in each order
+                # for B2C all sales are 1 unit
+                for j in range(numOrders):
+                    salesList.append(1)
 
-        quantitySold[i-1] = salesList
-        totalSales.append(sum(salesList))
+            # B2B orders
+            numOrders = 0
+            if i in B2BsaleDays:
+                if inclOrder:
+                    numOrders = int(round(41.685 * np.random.weibull(4.535), 0))
+                else:
+                    numOrders = int(round(B2BorderMean,0))
+
+                for j in range(numOrders):
+                    if inclSales:
+                        salesList.append(int(round(np.random.lognormal(2.0454, 1.0287),0)))
+                    else:
+                        salesList.append(round(B2BsalesMean))
+
+            quantitySold[numSim][i] = salesList # i-1 because time range is 1-730
+            totalSales[numSim][i] = (sum(salesList))
     return quantitySold, totalSales
 
-def eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2BsalesDF, seedNum, timeRange, serviceLvl, reorderPoint, Qstar, inclInputs):
+def eoqModel2(skuRef, inclSafety, timeRange, serviceLvl, reorderPoint, Qstar, inclInputs, demand, totalSales):
     # initial variables - time in days
     prodCost = 5.36 + 1 + 0.2  # P production + transport cost + incoming warehouse rate, from email from Don
     initialQ = findCurrentQ(skuRef)
@@ -576,7 +577,6 @@ def eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2
     leadTime = 15  # L in days
 
     # Find demand
-    demand, totalSales = createDemand2(inclOrder, inclTime, inclSales, timeRange, B2CsalesDF, B2BsalesDF, seedNum)
     meanDemand = sum(totalSales)/timeRange
 
     # Find re-order quantity
@@ -602,7 +602,7 @@ def eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2
     smallestMissedSale = 99999
 
     for t in range(1, timeRange):
-        # print t, type(quantity[t]), type(quantity[t-1]), type(sum(demand[t]))
+
         quantity[t] += quantity[t - 1] - sum(demand[t]) # quantity[t] should be 0 unless a reorder has been made
         if (quantity[t] < reorderPoint) & (reordered == False):
             if t + leadTime < timeRange:
@@ -706,6 +706,7 @@ def stockVSsales():
 
 # plot sims against stock lvls
     stockDF = ExploreData.readStock(skuRef)
+
 # # sum unique dates
 # # print stockDF
 # sumStockDF = sumStock(stockDF)
@@ -747,70 +748,103 @@ if __name__ == '__main__':
     # ozDF, twDF, activeDF, B2CsalesDF =  ExploreData.splitSales(salesDF)
 
     timeRange = 365*2  # in days, amount of days of stock reports
-    serviceLvl = 0.95  # service level (alpha):
+    serviceLvl = 0.975  # service level (alpha):
     numSims = 100
-
-    # distMethod = 2
-    # for distMethod in range(2,4):
-    #     print distMethod
-    #     EOQModel(skuRef, distMethod, dbSession)
 
     inclOrder = True
     inclTime = True
     inclSales = True
     inclSafety = True
     inclInputs = True
+    Counter = 0
+    Batch = 1
 
-    simList = []
-    for reorderPoint in range(400,2000,50):
-        for Qstar in range(1500,4000,50):
-            print reorderPoint, Qstar
-            # Create arrays
-            quantity = [[0 for x in range(timeRange + 1)] for y in range(0, numSims)]
-            msdSalesCumul = []
-            msdTimeCumul = []
-            reorderSchd = []
-            QstarSchd = []
-            yearCostCumul = []
-            lrgstMsdSaleCumul = []
-            smlstMsdSaleCumul = []
-            for i in range(0,numSims):
-                seedNum = i
-                quantity[i], missedSales, missedTime, reorderPoint, Qstar, yearCost, lrgstMsdSale, smlstMsdSale = \
-                    eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2BsalesDF, seedNum, timeRange, serviceLvl,reorderPoint, Qstar, inclInputs) #missedSales, missedTime, reorderPoint, Qstar
+    # calc demand vectors
+    demand, totalSales = createDemand2(inclOrder, inclTime, inclSales, timeRange, B2CsalesDF, B2BsalesDF, numSims)
+    # meanDemand = sum(totalSales)/timeRange
 
-                msdSalesCumul.append(missedSales)
-                msdTimeCumul.append(missedTime)
-                reorderSchd.append(reorderPoint)
-                QstarSchd.append(Qstar)
-                yearCostCumul.append(yearCost)
-                lrgstMsdSaleCumul.append(lrgstMsdSale)
-                smlstMsdSaleCumul.append(smlstMsdSale)
+    if inclInputs == True:
+        simList = []
+        for reorderPoint in range(600,1520,10):
+            for Qstar in range(2200,4000,10):
+                Counter += 1
+                print reorderPoint, Qstar, Counter
+                # Create arrays
+                quantity = [[0 for x in range(timeRange + 1)] for y in range(0, numSims)]
+                msdSalesCumul = []
+                msdTimeCumul = []
+                reorderSchd = []
+                QstarSchd = []
+                yearCostCumul = []
+                lrgstMsdSaleCumul = []
+                smlstMsdSaleCumul = []
+                avgInvLvl = []
+                for i in range(0,numSims):
+                    quantity[i], missedSales, missedTime, reorderPoint, Qstar, yearCost, lrgstMsdSale, smlstMsdSale = \
+                        eoqModel2(skuRef, inclSafety, timeRange, serviceLvl,reorderPoint, Qstar, inclInputs, demand[i], totalSales[i]) #missedSales, missedTime, reorderPoint, Qstar
 
-            simDF = pd.DataFrame({
-                                "simulationNumber": range(1,numSims+1),
-                                "reorderPoint": [reorderPoint]*len(range(1,numSims+1)),
-                                "Qstar": [Qstar]*len(range(1,numSims+1)),
-                                "missedDays": msdTimeCumul,
-                                "missedSales": msdSalesCumul,
-                                "largestMissedSale": lrgstMsdSaleCumul,
-                                "smallestMissedSale": smlstMsdSaleCumul,
-                                "quantity": quantity,
-                                "Cost": yearCostCumul
-            })
-            simList.append(simDF)
+                    msdSalesCumul.append(missedSales)
+                    msdTimeCumul.append(missedTime)
+                    reorderSchd.append(reorderPoint)
+                    QstarSchd.append(Qstar)
+                    yearCostCumul.append(yearCost)
+                    lrgstMsdSaleCumul.append(lrgstMsdSale)
+                    smlstMsdSaleCumul.append(smlstMsdSale)
+                    avgInvLvl.append(np.mean(quantity[i]))
 
-    storeDF = pd.concat(simList, axis=0, ignore_index=True)
+                simDF = pd.DataFrame({
+                                    "simulationNumber": range(1,numSims+1),
+                                    "reorderPoint": [reorderPoint]*len(range(1,numSims+1)),
+                                    "Qstar": [Qstar]*len(range(1,numSims+1)),
+                                    "missedDays": msdTimeCumul,
+                                    "missedSales": msdSalesCumul,
+                                    "largestMissedSale": lrgstMsdSaleCumul,
+                                    "smallestMissedSale": smlstMsdSaleCumul,
+                                    "quantity": quantity,
+                                    "Cost": yearCostCumul,
+                                    "AverageInventory": avgInvLvl
+                })
+                simList.append(simDF)
+                if Counter > 200:
+                    # store current results
+                    storeDF = pd.concat(simList, axis=0, ignore_index=True)
+                    fileDir = "SimulationResultsBatch" + str(Batch) + ".csv"
+                    print fileDir
+                    storeDF.to_csv(fileDir, index=False)
+                    # re-write results
+                    Batch += 1
+                    Counter = 0
+                    simList = []
 
-    # Write output to csv
-    fileDir = "SimulationResults.csv" #file name
-    storeDF.to_csv(fileDir, index=False)
+        storeDF = pd.concat(simList, axis=0, ignore_index=True)
 
+        # Write output to csv
+        fileDir = "SimulationResults22-9.csv" #file name
+        storeDF.to_csv(fileDir, index=False)
+    else:
+        for i in range(0, numSims):
+            seedNum = i
+            reorderPoint = 0
+            Qstar = 0
+            quantity[i], missedSales, missedTime, reorderPoint, Qstar, yearCost, lrgstMsdSale, smlstMsdSale = \
+                eoqModel2(skuRef, inclOrder, inclTime, inclSales, inclSafety, B2CsalesDF, B2BsalesDF, seedNum,
+                          timeRange, serviceLvl, reorderPoint, Qstar,
+                          inclInputs)  # missedSales, missedTime, reorderPoint, Qstar
+
+            msdSalesCumul.append(missedSales)
+            msdTimeCumul.append(missedTime)
+            reorderSchd.append(reorderPoint)
+            QstarSchd.append(Qstar)
+            yearCostCumul.append(yearCost)
+            lrgstMsdSaleCumul.append(lrgstMsdSale)
+            smlstMsdSaleCumul.append(smlstMsdSale)
+            avgInvLvl.append(np.mean(quantity[i]))
+            # Plot simulation results
+            plotSims(numSims, msdSalesCumul, msdTimeCumul, reorderSchd, QstarSchd)
 
     print("--- %s seconds ---" % (time.time() - startRunTime))
 
-    # Plot simulation results
-    # plotSims(numSims, msdSalesCumul, msdTimeCumul, reorderSchd, QstarSchd)
+
 
     # #turn individual tables to csvs
     # ozDF.to_csv("ozDF.csv", sep=',', header=True)
